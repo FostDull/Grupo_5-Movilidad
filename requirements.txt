@@ -1,0 +1,6 @@
+opencv-python
+transformers
+torch
+playsound
+requests
+Pillow
