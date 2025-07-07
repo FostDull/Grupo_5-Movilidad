@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Kuntur - Mobility</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #e9e9f0;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #004aad;
+      color: white;
+      padding: 15px 20px;
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      background: #0e5dbd;
+      color: white;
+      padding: 10px;
+      font-size: 0.95em;
+    }
+
+    .main-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 20px auto;
+      max-width: 1200px;
+      gap: 20px;
+    }
+
+    .video-section, .info-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+
+    .video-section {
+      flex: 1;
+      min-width: 640px;
+      max-width: 700px;
+    }
+
+    .video-section video {
+      width: 100%;
+      border-radius: 8px;
+      border: 2px solid #333;
+    }
+
+    .info-text {
+      margin-top: 10px;
+      text-align: left;
+      font-size: 1em;
+    }
+
+    .info-text strong {
+      display: inline-block;
+      width: 100px;
+    }
+
+    .score {
+      font-weight: bold;
+      font-size: 1.1em;
+      color: #004aad;
+    }
+
+    .info-section {
+      flex: 0.7;
+      min-width: 300px;
+    }
+
+    .info-section h3 {
+      margin-top: 0;
+    }
+
+    .event-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+
+    .event-table th, .event-table td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .event-table th {
+      background: #f4f4f4;
+    }
+
+    .btn {
+      width: 100%;
+      margin: 5px 0;
+      padding: 10px;
+      border: none;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+
+    .btn-orange {
+      background: #f39c12;
+      color: white;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .btn-location {
+      background: #3498db;
+      color: white;
+    }
+
+    footer {
+      text-align: center;
+      padding: 15px;
+      background: #222;
+      color: #ccc;
+      font-size: 0.85em;
+    }
+
+    .green-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #2ecc71;
+      border-radius: 50%;
+      margin-left: 6px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <header>Kuntur - Mobility</header>
+
+  <div class="status-bar">
+    <div>ESTADO CÁMARA: <span class="green-dot"></span></div>
+    <div>ESTADO MICRÓFONO: <span class="green-dot"></span></div>
+  </div>
+
+  <div class="main-container">
+
+    <!-- VIDEO SECTION -->
+    <div class="video-section">
+      <h2 style="text-align: center;">VIDEO EN VIVO</h2>
+      <video id="video" autoplay muted></video>
+
+      <div class="info-text">
+        <p><strong>Cooperativa:</strong> Transportes Catar</p>
+        <p><strong>Unidad:</strong> 007 &nbsp;&nbsp; <strong>PLACA:</strong> ASD-123</p>
+        <p><strong>Fecha:</strong> 2025-05-07 &nbsp;&nbsp; <strong>Hora:</strong> 14:30</p>
+        <p class="score">SCORE ACTUAL: 0.64</p>
+      </div>
+    </div>
+
+    <!-- INFO SECTION -->
+    <div class="info-section">
+      <h3>EVENTOS DESTACADOS</h3>
+      <table class="event-table">
+        <thead>
+          <tr>
+            <th>Fecha-Hora</th>
+            <th>Score</th>
+            <th>Descargar</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>2025-05-07 11:30</td><td>0.80</td><td><button class="btn btn-orange">⬇</button></td></tr>
+          <tr><td>2025-05-07 10:56</td><td>0.93</td><td><button class="btn btn-orange">⬇</button></td></tr>
+          <tr><td>2025-05-07 09:49</td><td>0.81</td><td><button class="btn btn-orange">⬇</button></td></tr>
+        </tbody>
+      </table>
+
+      <button class="btn btn-location">UBICACIÓN ACTUAL</button>
+      <button class="btn btn-orange">DESCARGAR REPORTE</button>
+      <button class="btn btn-danger" onclick="alert('¡Alarma activada!')">ACTIVAR ALARMA</button>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 Equipo SmartBusAI — <a href="#" style="color:#ccc;">Documentación</a> | <a href="#" style="color:#ccc;">Soporte</a>
+  </footer>
+
+  <script>
+    // Accede a la cámara
+    const video = document.getElementById("video");
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { alert("Error al acceder a la cámara: " + err); });
+  </script>
+
+</body>
+</html>
