@@ -1,157 +1,216 @@
 import streamlit as st
 import cv2
-import numpy as np
-import tensorflow as tf
 import os
 import gdown
 from ultralytics import YOLO
 from utils.distance_utils import calcular_distancia_real
-from utils.ollama_utils import clasificar_acoso
+from utils.ollama_utils import generar_justificacion
 from utils.alert_system import SistemaAlertas
+from collections import defaultdict
+from datetime import datetime
+
+# ==== Workaround para ultralytics 8.2.0: stub de DFLoss ====
+import ultralytics.utils.loss as _loss_mod
+class DFLoss:
+    def __init__(self, *args, **kwargs):
+        pass
+_loss_mod.DFLoss = DFLoss
 
 # Configurar página
 st.set_page_config(page_title="Detección Riesgos", layout="wide")
 
-# Descargar modelos desde Google Drive si no existen
+# ==== INPUT PARA CÁMARA IP ====
+st.sidebar.header("Configuración de cámara IP")
+ip_url = st.sidebar.text_input(
+    "URL de la cámara IP (e.g. rtsp://192.168.1.60:554/stream1)",
+    value="rtsp://192.168.1.60:554/stream1"
+)
+
+# Intentar abrir el stream
+cap = cv2.VideoCapture(ip_url)
+if not cap.isOpened():
+    st.error(f"No se pudo abrir la cámara IP en: {ip_url}")
+    st.stop()
+
+# Función IOU
+def calcular_iou(boxA, boxB):
+    xA = max(boxA[0], boxB[0]); yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2]); yB = min(boxA[3], boxB[3])
+    inter = max(0, xB-xA) * max(0, yB-yA)
+    areaA = (boxA[2]-boxA[0])*(boxA[3]-boxA[1])
+    areaB = (boxB[2]-boxB[0])*(boxB[3]-boxB[1])
+    return inter / float(areaA + areaB - inter)
+
+# Carga de modelos
 @st.cache_resource
 def cargar():
-    if not os.path.exists("modelos"):
-        os.makedirs("modelos")
+    os.makedirs("modelos", exist_ok=True)
 
-    # Descargar YOLOv8n
-    yolo_id = "1T6MQ3jnTs-yPdLaeUYkCyV57uRTZywHM"
-    yolo_path = "modelos/yolov8n.pt"
-    if not os.path.exists(yolo_path):
-        gdown.download(f"https://drive.google.com/uc?id={yolo_id}", yolo_path, quiet=False)
+    # Modelo personas (COCO)
+    p_path = "modelos/yolov8n.pt"
+    if not os.path.exists(p_path):
+        YOLO(p_path, task='detect')
 
-    # Descargar EfficientDet Lite
-    tflite_id = "1U7TR-BvJSr0aRbWoTEMFaTvrvtT78CCa"
-    tflite_path = "modelos/efficientdet_lite.tflite"
-    if not os.path.exists(tflite_path):
-        gdown.download(f"https://drive.google.com/uc?id={tflite_id}", tflite_path, quiet=False)
+    # Modelo armas especializado
+    a_path = "modelos/weapon_yolov8n.pt"
+    if not os.path.exists(a_path):
+        url = "https://github.com/Musawer1214/Weapon-Detection-YOLO/raw/main/best%20(3).pt"
+        try:
+            import torch
+            torch.hub.download_url_to_file(url, a_path)
+        except:
+            gdown.download(
+                "https://drive.google.com/uc?id=1ZgqjONv3q43H9eBd5cG6JNkYd6tOjf1D",
+                a_path, quiet=False
+            )
 
-    # Cargar modelos
-    yolo = YOLO(yolo_path)
-    interp = tf.lite.Interpreter(model_path=tflite_path)
-    interp.allocate_tensors()
-    return yolo, interp
+    model_p = YOLO(p_path, task='detect')
+    model_a = YOLO(a_path, task='detect')
+    return model_p, model_a
 
-# Iniciar webcam
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
-# Cargar modelos y sistema de alertas
-yolo, tflite = cargar()
+yolo_personas, yolo_armas = cargar()
 sistema = st.session_state.get('alertas', SistemaAlertas())
 st.session_state['alertas'] = sistema
 
 # Layout
 col1, col2 = st.columns([3, 1])
-vid_box = col1.empty()
-stats = col2.container()
-alertas = col2.container()
+vid_box           = col1.empty()
+stats_box         = col2.empty()
+situacion_box     = col2.empty()
+justificacion_box = col2.empty()
 
-# Loop de video
-frame_counter = 0
-resultados_personas = None
+# Parámetros
+MAX_AREA_RATIO   = 0.1
+DISTANCIA_UMBRAL = 1.5
+MIN_TIEMPO_ACOSO = 10
+MIN_ACERCAMIENTO = 0.2
+
+historial   = defaultdict(list)
+timestamps  = defaultdict(list)
+frame_count = 0
+res_pers    = None
+res_armas   = None
+ultima_act  = datetime.now()
 
 while True:
     ret, frame = cap.read()
     if not ret:
+        st.error("Error al capturar video. Verifica la cámara.")
         break
 
-    frame_counter += 1
+    frame_count += 1
 
-    # YOLO: seguimiento o detección
-    if frame_counter % 3 == 0:
-        try:
-            resultados_personas = yolo.track(frame, persist=True)[0]
-        except:
-            resultados_personas = yolo(frame)[0]
-    if resultados_personas is None:
-        resultados_personas = yolo(frame)[0]
+    # --- PERSONAS: detectar cada 3 frames, trackear entre medio ---
+    if frame_count % 3 == 0 or res_pers is None:
+        res_pers = yolo_personas.track(
+            frame, persist=True, classes=[0], imgsz=320, conf=0.3
+        )[0]
+    else:
+        res_pers = yolo_personas.track(
+            frame, persist=True, classes=[0], imgsz=320, conf=0.3
+        )[0]
 
-    # Personas detectadas
-    cajas = []
-    if resultados_personas.boxes is not None:
-        for caja in resultados_personas.boxes.xyxy.cpu().numpy():
-            x1, y1, x2, y2 = map(int, caja)
-            cajas.append((x1, y1, x2, y2))
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    cajas = {}
+    if res_pers and res_pers.boxes is not None:
+        for box in res_pers.boxes:
+            tid = int(box.id) if box.id is not None else None
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            if tid is not None:
+                cajas[tid] = (x1, y1, x2, y2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"ID:{tid}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-    # Armas con EfficientDet (filtrado por cajas humanas)
-    inp_det = tflite.get_input_details()[0]
-    out_boxes = tflite.get_output_details()[0]
-    out_classes = tflite.get_output_details()[1]
-    out_scores = tflite.get_output_details()[2]
-
-    img = cv2.resize(frame, (320, 320))
-    inp = np.expand_dims(img, axis=0).astype(np.uint8)
-    tflite.set_tensor(inp_det['index'], inp)
-    tflite.invoke()
-
-    boxes_t = tflite.get_tensor(out_boxes['index'])[0]
-    classes_t = tflite.get_tensor(out_classes['index'])[0]
-    scores_t = tflite.get_tensor(out_scores['index'])[0]
+    # --- ARMAS: detectar cada 6 frames, trackear entre medio ---
+    if frame_count % 6 == 0 or res_armas is None:
+        res_armas = yolo_armas.track(
+            frame, persist=True, imgsz=320, conf=0.5
+        )[0]
+    else:
+        res_armas = yolo_armas.track(
+            frame, persist=True, imgsz=320, conf=0.5
+        )[0]
 
     armas = []
-    for i in range(len(scores_t)):
-        if scores_t[i] > 0.6 and classes_t[i] == 0:
-            y1, x1, y2, x2 = boxes_t[i]
-            x1 = int(x1 * frame.shape[1])
-            x2 = int(x2 * frame.shape[1])
-            y1 = int(y1 * frame.shape[0])
-            y2 = int(y2 * frame.shape[0])
+    if res_armas and res_armas.boxes is not None:
+        for box in res_armas.boxes:
+            conf = box.conf.item()
+            if conf < 0.5:
+                continue
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            area = (x2 - x1) * (y2 - y1)
+            if area / (frame.shape[0] * frame.shape[1]) > MAX_AREA_RATIO:
+                continue
+            if any(calcular_iou((x1, y1, x2, y2), p) > 0.2 for p in cajas.values()):
+                continue
+            armas.append((x1, y1, x2, y2, conf))
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.putText(frame, f"ARMA {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-            # Verificar si está dentro de una persona
-            arma_en_persona = False
-            for px1, py1, px2, py2 in cajas:
-                if x1 >= px1 and y1 >= py1 and x2 <= px2 and y2 <= py2:
-                    arma_en_persona = True
-                    break
-
-            if not arma_en_persona:
-                armas.append((x1, y1, x2, y2))
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                cv2.putText(frame, "ARMA", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-
-    # Interacciones cercanas
-    interacciones = []
-    for i in range(len(cajas)):
-        for j in range(i + 1, len(cajas)):
-            d = calcular_distancia_real(cajas[i], cajas[j], frame.shape)
-            if d < 1.5:
-                interacciones.append((cajas[i], cajas[j], d))
-                cx1 = (cajas[i][0] + cajas[i][2]) // 2
-                cy1 = (cajas[i][1] + cajas[i][3]) // 2
-                cx2 = (cajas[j][0] + cajas[j][2]) // 2
-                cy2 = (cajas[j][1] + cajas[j][3]) // 2
+    # --- ACOSO ---
+    ids = list(cajas.keys())
+    posibles = []
+    for i in range(len(ids)):
+        for j in range(i+1, len(ids)):
+            id1, id2 = ids[i], ids[j]
+            b1, b2 = cajas[id1], cajas[id2]
+            d = calcular_distancia_real(b1, b2, frame.shape)
+            if d < DISTANCIA_UMBRAL:
+                par = tuple(sorted((id1, id2)))
+                historial[par].append(d)
+                timestamps[par].append(datetime.now())
+                historial[par] = [
+                    h for k, h in enumerate(historial[par])
+                    if (datetime.now() - timestamps[par][k]).seconds <= 30
+                ]
+                timestamps[par] = [
+                    t for t in timestamps[par]
+                    if (datetime.now() - t).seconds <= 30
+                ]
+                if len(historial[par]) > 2 and \
+                   (historial[par][0] - historial[par][-1]) > MIN_ACERCAMIENTO and \
+                   (timestamps[par][-1] - timestamps[par][0]).seconds > MIN_TIEMPO_ACOSO:
+                    posibles.append((id1, id2, d))
+                cx1, cy1 = (b1[0] + b1[2]) // 2, (b1[1] + b1[3]) // 2
+                cx2, cy2 = (b2[0] + b2[2]) // 2, (b2[1] + b2[3]) // 2
                 cv2.line(frame, (cx1, cy1), (cx2, cy2), (0, 0, 255), 2)
+                cv2.putText(frame, f"{d:.2f}m", ((cx1 + cx2)//2, (cy1 + cy2)//2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-    # Activar alertas
+    # --- ALERTAS ---
     if armas:
         sistema.activar("ARMA DETECTADA")
-    elif interacciones and sistema.registrar(len(interacciones)):
-        desc = f"{len(interacciones)} interacciones cercanas, distancia promedio {np.mean([d for *_, d in interacciones]):.2f} m"
-        if clasificar_acoso(desc):
-            sistema.activar("POSSIBLE ACOSO")
+    elif posibles and sistema.registrar(len(posibles)):
+        sistema.activar("POSIBLE ACOSO")
 
-    # Mostrar frame
+    # --- RENDER UI ---
     vid_box.image(frame, channels="BGR", use_column_width=True)
+    with stats_box.container():
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Personas", len(cajas))
+        c2.metric("Armas", len(armas))
+        c3.metric("Acosos", len(posibles))
 
-    # Métricas
-    with stats:
-        st.metric("Personas Detectadas", len(cajas))
-        st.metric("Interacciones Cercanas", len(interacciones))
-        st.metric("Armas Detectadas", len(armas))
-
-    # Estado de alerta
-    with alertas:
-        if sistema.alerta:
-            st.warning(sistema.tipo)
-        else:
-            st.success("Situación Normal")
+    ahora = datetime.now()
+    if (ahora - ultima_act).seconds >= 5:
+        ultima_act = ahora
+        with situacion_box.container():
+            if armas:
+                st.error("**SITUACIÓN: CRÍTICA**\nDetección de arma")
+            elif posibles:
+                st.warning("**SITUACIÓN: ACOSO**\nPatrón sospechoso")
+            else:
+                st.success("**SITUACIÓN: NORMAL**")
+        with justificacion_box.container():
+            if sistema.alerta:
+                if sistema.tipo == "ARMA DETECTADA":
+                    st.error("**Justificación:** Amenaza directa: arma detectada.")
+                else:
+                    desc = f"{len(posibles)} acercamientos sospechosos."
+                    just = generar_justificacion(desc)
+                    st.warning(f"**Justificación:** {just}")
+            else:
+                st.info("Sin amenazas detectadas")
 
 cap.release()
