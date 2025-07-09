@@ -16,13 +16,13 @@ bucket = b2_api.get_bucket_by_name(B2_BUCKET_NAME)
 download_url = b2_api.account_info.get_download_url()
 
 # Listar y generar URLs
-print("Archivos encontrados:\n")
+print("🔎 Archivos encontrados:\n")
 for file_version, folder_name in bucket.ls():
     file_name = file_version.file_name
 
-    # Corrección aquí
+    # ✅ Corrección aquí
     auth_token = bucket.get_download_authorization(file_name, TIEMPO_EN_SEGUNDOS)
     url = f"{download_url}/file/{B2_BUCKET_NAME}/{file_name}?Authorization={auth_token}"
 
     print(f"{file_name}:")
-    print(f"{url}\n")
+    print(f"🔗 {url}\n")
