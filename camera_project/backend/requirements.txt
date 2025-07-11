@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+b2sdk
+python-dotenv
+python-multipart
