@@ -24,6 +24,25 @@ model = WhisperModel(modelo, device=device, compute_type=compute_type)
 # === Cola de audio ===
 cola_audio = Queue()
 
+def obtener_ubicacion():
+    try:
+        response = requests.get("http://ip-api.com/json/")
+        if response.status_code == 200:
+            data = response.json()
+            ciudad = data.get("city", "Desconocida")
+            region = data.get("regionName", "")
+            pais = data.get("country", "")
+            lat = data.get("lat")
+            lon = data.get("lon")
+
+            ubicacion_texto = f"{ciudad}, {region}, {pais}"
+            return ubicacion_texto, lat, lon
+        else:
+            return "Ubicación no disponible", 0.0, 0.0
+    except Exception as e:
+        print(f"Error al obtener ubicación: {e}")
+        return "Ubicación no disponible", 0.0, 0.0
+
 def grabar_audio():
     print("Grabando...")
     while True:
@@ -50,11 +69,16 @@ def procesar_bloque(audio):
 
         texto_completo = texto_completo.strip()
 
-        # Preparar datos para enviar a FastAPI, asegurándonos que sean strings UTF-8
+        # Obtener ubicación con latitud y longitud
+        ubicacion_texto, latitud, longitud = obtener_ubicacion()
+
+        # Preparar datos para enviar a FastAPI
         data = {
-            "descripcion": texto_completo if isinstance(texto_completo, str) else texto_completo.decode("utf-8", errors="ignore"),
-            "ubicacion": "No especificada",
-            "url": url_evidencia if isinstance(url_evidencia, str) else url_evidencia.decode("utf-8", errors="ignore")
+            "descripcion": texto_completo,
+            "ubicacion": ubicacion_texto,
+            "latitud": latitud,
+            "longitud": longitud,
+            "url": url_evidencia
         }
 
         # Enviar a FastAPI

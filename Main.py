@@ -44,6 +44,8 @@ bucket = b2_api.get_bucket_by_name(os.getenv("B2_BUCKET"))
 class Denuncia(BaseModel):
     descripcion: str
     ubicacion: str
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
     url: Optional[HttpUrl] = None
 
 # === Endpoint raíz ===
@@ -53,7 +55,13 @@ async def root():
 
 # === Subida de video con metadatos ===
 @app.post("/upload-video/")
-async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubicacion: str = ""):
+async def upload_video(
+    file: UploadFile = File(...),
+    descripcion: str = "",
+    ubicacion: str = "",
+    latitud: Optional[float] = None,
+    longitud: Optional[float] = None
+):
     valid_types = [
         "video/webm",
         "video/mp4",
@@ -82,6 +90,8 @@ async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubic
         coleccion.insert_one({
             "descripcion": descripcion,
             "ubicacion": ubicacion,
+            "latitud": latitud,
+            "longitud": longitud,
             "url": url_publica,
             "nombre_original": file.filename,
             "nombre_guardado": archivo_subido.file_name,
@@ -114,6 +124,8 @@ async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(No
     documento = {
         "descripcion": data.descripcion,
         "ubicacion": data.ubicacion,
+        "latitud": data.latitud,
+        "longitud": data.longitud,
         "url": str(evidencia_url) if evidencia_url else None,
         "fecha": datetime.utcnow()
     }
@@ -128,6 +140,8 @@ async def denuncia_audio(data: Denuncia):
         coleccion.insert_one({
             "descripcion": data.descripcion,
             "ubicacion": data.ubicacion,
+            "latitud": data.latitud,
+            "longitud": data.longitud,
             "url": str(data.url) if data.url else None,
             "fecha": datetime.utcnow()
         })
