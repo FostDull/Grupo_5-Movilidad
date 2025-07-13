@@ -6,86 +6,79 @@ import tempfile
 import os
 import threading
 from scipy.io.wavfile import write
-import signal
-import sys
+from util.backblaze_uploader import subir_a_backblaze
+import requests
+import json
 
-# Importar función de subida a Backblaze
-from backblaze_uploader import subir_a_backblaze
-
-# Configuración
-fs = 16000  # Frecuencia de muestreo en Hz
-chunk_duration = 2  # Duración de cada bloque de audio en segundos
-modelo = "small"  # Opciones: tiny / base / small / medium / large
+# === Configuración ===
+fs = 16000  # frecuencia de muestreo
+chunk_duration = 10  # segundos por bloque
+modelo = "small"
 idioma_fijo = "es"
 device = "cpu"
 compute_type = "int8"
 
-# Crear modelo de transcripción
+# === Modelo ===
 model = WhisperModel(modelo, device=device, compute_type=compute_type)
 
-# Cola de audio compartida
+# === Cola de audio ===
 cola_audio = Queue()
 
-# Evento para detener los hilos de forma segura
-stop_event = threading.Event()
-
 def grabar_audio():
-    print("🎙️ Grabando audio... Presiona Ctrl+C para detener.")
-    while not stop_event.is_set():
-        try:
-            audio = sd.rec(int(chunk_duration * fs), samplerate=fs, channels=1, dtype="int16")
-            sd.wait()
+    print("Grabando...")
+    while True:
+        audio = sd.rec(int(chunk_duration * fs), samplerate=fs, channels=1, dtype="int16")
+        sd.wait()
+        cola_audio.put(audio.copy())
 
-            # Validar que no sea un bloque completamente silencioso
-            if np.abs(audio).mean() < 50:
-                print("⚠️ Audio muy silencioso, descartado.")
-                continue
+def procesar_bloque(audio):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            write(f.name, fs, audio)
+            audio_path = f.name
 
-            cola_audio.put(audio.copy())
-        except Exception as e:
-            print(f"❌ Error al grabar audio: {e}")
+        # Subir a Backblaze (bloqueante para asegurarnos URL)
+        url_evidencia = subir_a_backblaze(audio_path)
+
+        # Transcribir (bloqueante)
+        segments, _ = model.transcribe(audio_path, language=idioma_fijo, beam_size=1)
+
+        texto_completo = ""
+        for segment in segments:
+            texto_completo += segment.text + " "
+            print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
+
+        texto_completo = texto_completo.strip()
+
+        # Preparar datos para enviar a FastAPI, asegurándonos que sean strings UTF-8
+        data = {
+            "descripcion": texto_completo if isinstance(texto_completo, str) else texto_completo.decode("utf-8", errors="ignore"),
+            "ubicacion": "No especificada",
+            "url": url_evidencia if isinstance(url_evidencia, str) else url_evidencia.decode("utf-8", errors="ignore")
+        }
+
+        # Enviar a FastAPI
+        response = requests.post("http://127.0.0.1:8086/denuncias/audio/", json=data)
+        print(f"Enviado a FastAPI: {response.status_code} {response.text}")
+
+    except Exception as e:
+        print(f"Error en procesamiento: {e}")
+
+    finally:
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
 
 def transcribir_audio():
-    while not stop_event.is_set():
-        try:
-            audio = cola_audio.get(timeout=1)  # espera máximo 1s por audio
+    while True:
+        audio = cola_audio.get()
+        threading.Thread(target=procesar_bloque, args=(audio,), daemon=True).start()
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-                write(f.name, fs, audio)
-                audio_path = f.name
-
-            # Subir a Backblaze (opcional)
-            subir_a_backblaze(audio_path)
-
-            # Transcripción
-            try:
-                segments, _ = model.transcribe(audio_path, language=idioma_fijo, beam_size=1)
-                for segment in segments:
-                    print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
-            finally:
-                os.remove(audio_path)
-
-        except Exception as e:
-            if not stop_event.is_set():
-                print(f"❌ Error al transcribir audio: {e}")
-
-# Manejo de señal para detener el programa con Ctrl+C
-def detener_programa(signal_num, frame):
-    print("\n🛑 Deteniendo programa...")
-    stop_event.set()
-
-# Asociar Ctrl+C al manejador
-signal.signal(signal.SIGINT, detener_programa)
-
-# Crear e iniciar hilos
-hilo_grabacion = threading.Thread(target=grabar_audio)
-hilo_transcripcion = threading.Thread(target=transcribir_audio)
+# === Lanzar hilos ===
+hilo_grabacion = threading.Thread(target=grabar_audio, daemon=True)
+hilo_transcripcion = threading.Thread(target=transcribir_audio, daemon=True)
 
 hilo_grabacion.start()
 hilo_transcripcion.start()
 
-# Esperar a que los hilos terminen
 hilo_grabacion.join()
 hilo_transcripcion.join()
-
-print("✅ Programa finalizado correctamente.")
