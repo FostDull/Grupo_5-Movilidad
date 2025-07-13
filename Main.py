@@ -1,83 +1,133 @@
-import cv2
+# main.py
+
+import os
+import uuid
 import time
-from transformers import pipeline
-from playsound import playsound
-import requests
-import threading
+from datetime import datetime
+from typing import Optional
 
-# Cargar modelo de clasificación de imágenes de Hugging Face
-modelo = pipeline("image-classification", model="google/vit-base-patch16-224")
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
+from dotenv import load_dotenv
 
-# Simula funciones de impacto del sistema
-def activar_alarma():
-    print(" Alarma activada")
-    # Puedes reemplazar con un archivo de sonido real
-    playsound("alarma.mp3")
+from models.denuncia import Denuncia  # <--- Aquí se importa el modelo
 
-def cerrar_puertas():
-    print("Puertas cerradas automáticamente (simulado)")
+# === Cargar .env ===
+load_dotenv()
 
-def notificar_autoridades(evento="Robo detectado"):
-    print("Notificando a la policía...")
-    data = {
-        "evento": evento,
-        "ubicacion": "Lat: -0.2345, Lon: -78.5243",  # Simulado
-        "vehiculo": "Bus 012",
-        "hora": time.strftime("%Y-%m-%d %H:%M:%S")
-    }
+# === FastAPI y CORS ===
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === MongoDB Atlas ===
+mongo_uri = os.getenv("MONGO_URI")
+mongo_db = os.getenv("MONGO_DB")
+mongo_collection = os.getenv("MONGO_COLLECTION")
+
+client = MongoClient(mongo_uri, server_api=ServerApi("1"))
+db = client[mongo_db]
+coleccion = db[mongo_collection]
+
+# === Backblaze B2 ===
+info = InMemoryAccountInfo()
+b2_api = B2Api(info)
+b2_api.authorize_account("production", os.getenv("B2_KEY_ID"), os.getenv("B2_APP_KEY"))
+bucket = b2_api.get_bucket_by_name(os.getenv("B2_BUCKET"))
+
+# === Endpoints ===
+
+@app.get("/")
+async def root():
+    return {"message": "Servidor funcionando"}
+
+@app.post("/upload-video/")
+async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubicacion: str = ""):
+    valid_types = [
+        "video/webm",
+        "video/mp4",
+        "video/quicktime",
+        "video/x-msvideo",
+        "application/octet-stream"
+    ]
+
+    if file.content_type not in valid_types:
+        if not any(file.filename.lower().endswith(ext) for ext in ['.webm', '.mp4', '.mov', '.avi']):
+            raise HTTPException(400, "Tipo de archivo no soportado. Formatos aceptados: .webm, .mp4, .mov, .avi")
+
+    file_ext = os.path.splitext(file.filename)[1] or ".webm"
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+
     try:
-        # Simula notificación (puedes conectar a API real)
-        # requests.post("https://policia.api/alerta", json=data)
-        print("Autoridades notificadas:", data)
+        start = time.time()
+        contenido = await file.read()
+        archivo_subido = bucket.upload_bytes(contenido, unique_filename)
+        url_publica = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
+        elapsed = time.time() - start
+
+        coleccion.insert_one({
+            "descripcion": descripcion,
+            "ubicacion": ubicacion,
+            "url": url_publica,
+            "nombre_original": file.filename,
+            "nombre_guardado": archivo_subido.file_name,
+            "fecha": datetime.utcnow()
+        })
+
+        return {
+            "mensaje": f"Video subido a B2 ({len(contenido) / 1024:.1f} KB en {elapsed:.2f}s)",
+            "url_video": url_publica,
+            "nombre_archivo": archivo_subido.file_name
+        }
+
     except Exception as e:
-        print("Error al notificar:", e)
+        raise HTTPException(500, f"Error al guardar el video: {str(e)}")
 
-# Procesa el frame con IA
-def procesar_frame(frame):
-    # Convertir frame (BGR) a RGB y luego a formato de PIL
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = modelo(rgb)
+@app.post("/denuncias/")
+async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(None)):
+    if data.url and archivo:
+        raise HTTPException(400, detail="No se puede enviar URL y archivo al mismo tiempo.")
 
-    # Mostrar resultados top 1
-    etiqueta = results[0]['label']
-    score = results[0]['score']
-    print(f"[IA] Detectado: {etiqueta} - Confianza: {score:.2f}")
+    evidencia_url = data.url
 
-    # Simulación: si detecta "person" con score alto, activa sistema
-    if "person" in etiqueta.lower() and score > 0.9:
-        print("Comportamiento sospechoso detectado")
-        activar_sistema_alerta()
+    if archivo:
+        contenido = await archivo.read()
+        nombre = archivo.filename
+        archivo_subido = bucket.upload_bytes(contenido, nombre)
+        evidencia_url = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
 
-# Lógica de alerta
-def activar_sistema_alerta():
-    threading.Thread(target=activar_alarma).start()
-    cerrar_puertas()
-    notificar_autoridades()
+    documento = {
+        "descripcion": data.descripcion,
+        "ubicacion": data.ubicacion,
+        "url": str(evidencia_url) if evidencia_url else None,
+        "fecha": datetime.utcnow()
+    }
 
-# Captura desde cámara
-def iniciar_monitoreo():
-    cap = cv2.VideoCapture(0)
-    print("Monitoreo iniciado. Presiona 'q' para salir.")
+    coleccion.insert_one(documento)
+    return {"mensaje": "Denuncia registrada", "url_evidencia": evidencia_url}
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+@app.post("/denuncias/audio/")
+async def denuncia_audio(data: Denuncia):
+    try:
+        coleccion.insert_one({
+            "descripcion": data.descripcion,
+            "ubicacion": data.ubicacion,
+            "url": str(data.url) if data.url else None,
+            "fecha": datetime.utcnow()
+        })
+        return {"mensaje": "Denuncia de audio registrada correctamente"}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
-        cv2.imshow("Monitoreo en tiempo real", frame)
-
-        # Procesar cada 3 segundos un frame
-        if int(time.time()) % 3 == 0:
-            procesar_frame(frame)
-            time.sleep(1)  # evitar sobrecarga
-
-        # Salir con tecla 'q'
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-    print("Monitoreo detenido")
-
+# === Ejecutar localmente ===
 if __name__ == "__main__":
-    iniciar_monitoreo()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
