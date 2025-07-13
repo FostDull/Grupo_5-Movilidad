@@ -6,7 +6,7 @@ import tempfile
 import os
 import threading
 from scipy.io.wavfile import write
-from backblaze_uploader import subir_a_backblaze
+from util.backblaze_uploader import subir_a_backblaze
 import requests
 import json
 
