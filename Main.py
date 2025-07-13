@@ -1,5 +1,3 @@
-# main.py
-
 import os
 import uuid
 import time
@@ -8,19 +6,18 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, HttpUrl
+
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
 from dotenv import load_dotenv
 
-from models.denuncia import Denuncia  # <--- Aquí se importa el modelo
-
 # === Cargar .env ===
 load_dotenv()
 
-# === FastAPI y CORS ===
+# === Configuración CORS ===
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,12 +40,18 @@ b2_api = B2Api(info)
 b2_api.authorize_account("production", os.getenv("B2_KEY_ID"), os.getenv("B2_APP_KEY"))
 bucket = b2_api.get_bucket_by_name(os.getenv("B2_BUCKET"))
 
-# === Endpoints ===
+# === Modelo de datos ===
+class Denuncia(BaseModel):
+    descripcion: str
+    ubicacion: str
+    url: Optional[HttpUrl] = None
 
+# === Endpoint raíz ===
 @app.get("/")
 async def root():
     return {"message": "Servidor funcionando"}
 
+# === Subida de video con metadatos ===
 @app.post("/upload-video/")
 async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubicacion: str = ""):
     valid_types = [
@@ -59,10 +62,12 @@ async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubic
         "application/octet-stream"
     ]
 
+    # Verificación MIME
     if file.content_type not in valid_types:
         if not any(file.filename.lower().endswith(ext) for ext in ['.webm', '.mp4', '.mov', '.avi']):
             raise HTTPException(400, "Tipo de archivo no soportado. Formatos aceptados: .webm, .mp4, .mov, .avi")
 
+    # Generar nombre único
     file_ext = os.path.splitext(file.filename)[1] or ".webm"
     unique_filename = f"{uuid.uuid4()}{file_ext}"
 
@@ -73,6 +78,7 @@ async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubic
         url_publica = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
         elapsed = time.time() - start
 
+        # Guardar en Mongo
         coleccion.insert_one({
             "descripcion": descripcion,
             "ubicacion": ubicacion,
@@ -91,6 +97,7 @@ async def upload_video(file: UploadFile = File(...), descripcion: str = "", ubic
     except Exception as e:
         raise HTTPException(500, f"Error al guardar el video: {str(e)}")
 
+# === Endpoint para denuncias con archivo o URL ===
 @app.post("/denuncias/")
 async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(None)):
     if data.url and archivo:
@@ -114,6 +121,7 @@ async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(No
     coleccion.insert_one(documento)
     return {"mensaje": "Denuncia registrada", "url_evidencia": evidencia_url}
 
+# === Endpoint para denuncias sin archivo (por ejemplo, audio ya transcrito) ===
 @app.post("/denuncias/audio/")
 async def denuncia_audio(data: Denuncia):
     try:
@@ -127,7 +135,7 @@ async def denuncia_audio(data: Denuncia):
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 
-# === Ejecutar localmente ===
+# === Arranque local ===
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
