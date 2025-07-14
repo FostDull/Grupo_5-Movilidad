@@ -45,3 +45,8 @@ Thumbs.db
 
 # Backblaze credentials
 b2_credentials.json
+
+# Node.js
+node_modules/
+dist/
+.env

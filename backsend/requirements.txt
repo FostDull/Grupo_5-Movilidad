@@ -4,8 +4,8 @@ uvicorn==0.29.0
 python-multipart==0.0.9
 
 # === MongoDB y configuración ===
-pymongo
-python-dotenv
+pymongo==4.6.3
+python-dotenv==1.0.1
 
 # === Backblaze B2 ===
 b2sdk==1.26.0
@@ -17,10 +17,10 @@ numpy==1.26.4
 
 # === Transcripción y modelos ===
 faster-whisper==1.0.1
-ctranslate2        # no especificaste versión, la más reciente es recomendable
-torch==2.2.2       # mantengo la versión más nueva que diste
-ffmpeg-python==0.2.0
+ctranslate2==3.21.0          # versión recomendada estable
+torch==2.2.2
 torchaudio==2.2.1
+ffmpeg-python==0.2.0
 
 # === Visión por computadora y modelos adicionales ===
 opencv-python-headless==4.9.0.80
@@ -33,7 +33,4 @@ langchain-groq==0.1.2
 # === Herramientas varias ===
 requests==2.31.0
 watchdog==4.0.0
-
-opencv-python-headless==4.9.0.80
-opencv-python-headless
-pandas
+pandas==2.2.2
