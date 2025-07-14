@@ -2,50 +2,158 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Cámara IP + Grabación</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kuntur - Sistema Anti-Extorsiones</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #status {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 5px;
-      background: #f0f0f0;
-      min-height: 20px;
+    :root {
+      --color-dark: #6080F1;
+      --color-primary: #384C81;
+      --color-secondary: #744098;
+      --color-neutro: #EEEEEE;
+      --color-info: #4ABEE2;
+      --color-success: #2FA5CC;
+      --color-danger: #CBAAFF;
+      --color-warning: #FFDD00;
+      --color-white: #FFFFFF;
+      --gradient-primary: linear-gradient(90deg, #744098 0%, #384C81 100%);
     }
-    #recordBtn {
-      padding: 12px 24px;
-      font-size: 18px;
-      cursor: pointer;
-      background: #4CAF50;
-      color: white;
+
+    body {
+      background-color: var(--color-white);
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+    }
+
+    .header, .footer {
+      background: var(--gradient-primary);
+      color: var(--color-white);
+      padding: 1rem;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .header-title img {
+      height: 50px;
+    }
+
+    .header-title h3 {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .camera-panel {
+      background: var(--color-white);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border: 1px solid var(--color-neutro);
+    }
+
+    .status-box {
+      font-size: 0.95rem;
+      margin-top: 1rem;
+    }
+
+    .recording {
+      background-color: #dc3545 !important;
+    }
+
+    .stats-box span {
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    .btn-lg {
+      font-size: 1.2rem;
+      padding: 0.75rem 1.5rem;
+    }
+
+    .button-primary {
+      background: var(--gradient-primary);
+      color: var(--color-white);
+      font-weight: 600;
       border: none;
-      border-radius: 4px;
-      transition: background 0.3s;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
     }
-    #recordBtn:disabled { background: #cccccc; }
-    #recordBtn.recording { background: #f44336; }
-    .error { color: #d32f2f; }
-    .success { color: #388e3c; }
-    .warning { color: #f57c00; }
-    .info { color: #1976d2; }
+    .button-primary:hover {
+      background: #2b2f8f;
+    }
+
+    #map {
+      height: 200px;
+      border-radius: 10px;
+      border: 1px solid var(--color-neutro);
+      margin-top: 1rem;
+    }
+
+    /* Status message colors */
+    .text-info { color: #1976d2; }
+    .text-success { color: #388e3c; }
+    .text-warning { color: #f57c00; }
+    .text-danger { color: #d32f2f; }
   </style>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
 </head>
 <body>
-  <h1>Cámara IP en Vivo</h1>
+  <header class="header d-flex justify-content-between align-items-center">
+    <div class="header-title">
+      <img src="/static/img/Kuntur_blanco.png" alt="Logo" />
+      <h3>Kuntur - Movilidad</h3>
+    </div>
+  </header>
 
-  <div>
-    <img id="ipCamDisplay" width="640" height="480" alt="Cámara IP" crossorigin="anonymous" />
-  </div>
+  <main class="container my-4">
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="camera-panel">
+          <h5 class="mb-3">Cámara de Seguridad</h5>
+          <img id="ipCamDisplay" width="100%" height="auto" alt="Cámara IP" crossorigin="anonymous" style="border-radius: 1rem; border: 2px solid var(--color-neutro);" />
+          <div class="mt-4">
+            <button id="recordBtn" class="button-primary btn-lg">Iniciar Grabación</button>
+            <div id="status" class="status-box text-info">Estado: Cámara activa</div>
+          </div>
+        </div>
+      </div>
 
-  <button id="recordBtn" onclick="startRecording()">Iniciar Grabación</button>
-  <div id="status">Estado: Cámara activa</div>
+      <div class="col-lg-4">
+        <div class="camera-panel">
+          <h6 class="mb-3">Información del Transporte</h6>
+          <div class="stats-box">
+            <p>Unidad: <span>009</span></p>
+            <p>Placa: <span>PCA-123</span></p>
+            <p>Conductor: <span>Juan Chores</span></p>
+            <p>Ruta: <span>Terminal Sur - Av. Colón</span></p>
+            <p>Horario: <span>06:00 - 22:00</span></p>
+            <hr />
+            <p>Ubicación en Tiempo Real:</p>
+            <div id="map"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer d-flex justify-content-center">
+    <p class="m-0">KUNTUR 2025 ©</p>
+  </footer>
 
   <script>
     const img = document.getElementById("ipCamDisplay");
     const recordBtn = document.getElementById("recordBtn");
     const status = document.getElementById("status");
 
-    // URL de la cámara IP
     const ipCamUrl = "http://192.168.100.249:8080/video";
     img.src = ipCamUrl;
 
@@ -57,184 +165,129 @@
     let mediaRecorder = null;
     let chunks = [];
     let isRecording = false;
-    let framesCaptured = 0;
     let captureInterval;
-    let mimeType = 'video/mp4'; // Forzar formato MP4
+    let segmentTimeout;
+    let mimeType = 'video/mp4'; // Aquí lo mantengo como mp4 según tu pedido
 
-    function logStatus(message, type = "info") {
-      status.innerHTML = `<span class="${type}">${message}</span>`;
-      console.log(`${type.toUpperCase()}: ${message}`);
+    function logStatus(msg, type = 'info') {
+      status.className = `status-box text-${type}`;
+      status.textContent = msg;
     }
 
-    // 1. Verificar soporte de MediaRecorder
-    function checkMediaRecorderSupport() {
-      if (!window.MediaRecorder) {
-        logStatus("Tu navegador no soporta MediaRecorder API", "error");
-        return false;
-      }
-
-      // Verificar soporte para MP4
-      if (!MediaRecorder.isTypeSupported('video/mp4')) {
-        logStatus("MP4 no soportado. Usando WebM como alternativa.", "warning");
-        mimeType = 'video/webm';
-      }
-
-      return true;
-    }
-
-    // 2. Iniciar captura de frames
     function captureFrame() {
       if (!isRecording) return;
+      try {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      } catch (e) {
+        logStatus(`Error dibujando frame: ${e.message}`, 'danger');
+      }
+    }
+
+    function startSegment() {
+      if (!isRecording) return;
+
+      chunks = [];
+      const stream = canvas.captureStream(10); // 10 fps
 
       try {
-        // Dibujar la imagen actual en el canvas
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        framesCaptured++;
-      } catch (e) {
-        logStatus(`Error capturando frame: ${e.message}`, "error");
-      }
-    }
-
-    // 3. Iniciar grabación
-    function startRecording() {
-      if (isRecording) return;
-
-      // Reiniciar contadores
-      framesCaptured = 0;
-      chunks = [];
-      isRecording = true;
-      recordBtn.disabled = true;
-      recordBtn.textContent = "🔴 Grabando...";
-      recordBtn.classList.add("recording");
-
-      logStatus("Iniciando captura de frames...", "info");
-
-      // Iniciar captura de frames (10 FPS)
-      captureInterval = setInterval(captureFrame, 100);
-
-      // Esperar 0.5 segundos para asegurar captura inicial
-      setTimeout(() => {
-        if (framesCaptured === 0) {
-          logStatus("No se capturaron frames. Verifique la cámara.", "error");
-          stopRecording();
-          return;
-        }
-
-        logStatus(`${framesCaptured} frames capturados. Iniciando grabación...`, "info");
-
-        try {
-          // Crear stream desde el canvas
-          const stream = canvas.captureStream(10); // 10 FPS
-
-          mediaRecorder = new MediaRecorder(stream, {
-            mimeType: mimeType
-          });
-
-          mediaRecorder.ondataavailable = e => {
-            if (e.data.size > 0) {
-              chunks.push(e.data);
-            }
-          };
-
-          mediaRecorder.onstop = uploadVideo;
-          mediaRecorder.onerror = e => {
-            logStatus(`Error en grabación: ${e.error.name}`, "error");
-            stopRecording();
-          };
-
-          mediaRecorder.start(1000); // Grabar en chunks de 1 segundo
-          logStatus(`🎥 Grabando en formato: ${mimeType}`, "success");
-
-          // Detener después de 10 segundos
-          setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-              mediaRecorder.stop();
-            }
-          }, 10000);
-
-        } catch (e) {
-          logStatus(`Error al iniciar grabación: ${e.message}`, "error");
-          stopRecording();
-        }
-      }, 500);
-    }
-
-    // 4. Detener grabación
-    function stopRecording() {
-      isRecording = false;
-      clearInterval(captureInterval);
-
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch(e) {
+        logStatus(`Error al crear MediaRecorder con mimeType ${mimeType}: ${e.message}`, 'danger');
+        // Fallback a webm para que no falle
+        mimeType = 'video/webm';
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        logStatus(`Cambiado mimeType a ${mimeType}`, 'warning');
       }
 
-      recordBtn.disabled = false;
-      recordBtn.classList.remove("recording");
-      recordBtn.textContent = "Iniciar Grabación";
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = uploadVideo;
+      mediaRecorder.start();
+
+      segmentTimeout = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+      }, 25000);
     }
 
-    // 5. Subir video
     async function uploadVideo() {
       if (chunks.length === 0) {
-        logStatus("No hay datos de video para subir", "warning");
+        logStatus("Segmento vacío, sin datos para subir.", "warning");
+        if (isRecording) startSegment();
         return;
       }
 
+      const blob = new Blob(chunks, { type: mimeType });
+      const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const fileName = `video_${Date.now()}.${extension}`;
+      const file = new File([blob], fileName, { type: mimeType });
+
+      const formData = new FormData();
+      formData.append("file", file, fileName);
+
+      logStatus("Subiendo segmento...", "info");
+
       try {
-        // Crear el blob con el formato correcto
-        const blob = new Blob(chunks, { type: mimeType });
-
-        // Determinar extensión basada en el MIME type
-        const fileExtension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-
-        logStatus(`Video creado: ${blob.size} bytes, ${framesCaptured} frames`, "info");
-
-        if (blob.size === 0) {
-          logStatus("El video está vacío", "warning");
-          return;
-        }
-
-        const formData = new FormData();
-        const fileName = `video_${Date.now()}.${fileExtension}`;
-
-        // Crear un objeto File para forzar el tipo MIME
-        const file = new File([blob], fileName, { type: mimeType });
-        formData.append("file", file, fileName);
-
-        logStatus("Subiendo video al servidor...", "info");
-
-        const response = await fetch("http://localhost:8001/upload-video/", {
+        const res = await fetch("http://localhost:8001/upload-video/", {
           method: "POST",
           body: formData
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-        }
-
-        const result = await response.json();
-        logStatus(`✅ Video subido: ${result.message}`, "success");
-
-      } catch (err) {
-        logStatus(`❌ Error al subir: ${err.message}`, "error");
+        if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+        const json = await res.json();
+        logStatus(`✅ Segmento subido: ${json.message}`, "success");
+      } catch (e) {
+        logStatus(`❌ Error subida: ${e.message}`, "danger");
       } finally {
-        stopRecording();
+        if (isRecording) startSegment();
       }
     }
 
-    // Inicialización
-    function init() {
-      // Verificar compatibilidad
-      if (!checkMediaRecorderSupport()) {
-        recordBtn.disabled = true;
+    function toggleRecording() {
+      if (isRecording) {
+        isRecording = false;
+        clearInterval(captureInterval);
+        clearTimeout(segmentTimeout);
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+        recordBtn.textContent = "Iniciar Grabación";
+        logStatus("Grabación detenida manualmente", "warning");
+      } else {
+        isRecording = true;
+        recordBtn.textContent = "Detener Grabación";
+        captureInterval = setInterval(captureFrame, 100);
+        startSegment();
+        logStatus("🎥 Grabando en segmentos de 25 segundos...", "info");
       }
+    }
 
-      // La cámara ya está funcionando en el elemento img
+    recordBtn.onclick = toggleRecording;
+
+    window.onload = () => {
       logStatus("Cámara activa", "success");
-    }
 
-    // Iniciar cuando la página cargue
-    window.onload = init;
+      // Mapa con Leaflet
+      const map = L.map('map').setView([0, 0], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          map.setView([lat, lon], 15);
+          L.marker([lat, lon]).addTo(map).bindPopup("Ubicación actual").openPopup();
+        }, error => {
+          console.error("Error obteniendo ubicación:", error);
+        });
+      } else {
+        console.error("Geolocalización no soportada");
+      }
+    };
   </script>
 </body>
 </html>

@@ -67,7 +67,8 @@ def generar_descripcion_enriquecida(analisis_visual, transcripcion_audio):
 
     # Crear prompt para LLM
     prompt = ChatPromptTemplate.from_template(
-        "Eres un analista de seguridad experto en temas de asaltos y acosos en transporte publico. Combina la siguiente información para crear "
+        "Eres un analista de seguridad experto en temas de asaltos y acosos en transporte publico. Si detectas dentro del audio palabras como Telefono,Catera,Celular o parecidos hablamos de un asalto"
+        "si detectas palabras como hola guapa hermosa y asi hablamos de acoso. Combina la siguiente información para crear "
         "una descripción coherente de un posible incidente de seguridad:\n\n"
         "Análisis visual: {info_visual}\n"
         "Transcripción de audio: {transcripcion}\n\n"
