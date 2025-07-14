@@ -1,148 +1,104 @@
 import React, { useEffect, useRef, useState } from "react";
 
-export default function IPCameraRecorder() {
-  const ipCamUrl = "http://192.168.100.204:8080/video";
-  const videoRef = useRef(null);
+const IPCameraRecorder = () => {
+  const imgRef = useRef(null);
   const canvasRef = useRef(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [status, setStatus] = useState("Estado: Cámara activa");
-  const [chunks, setChunks] = useState([]);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [framesCaptured, setFramesCaptured] = useState(0);
-  const captureIntervalRef = useRef(null);
-  const mimeTypeRef = useRef("video/mp4");
+  const [status, setStatus] = useState("Cámara activa");
+  const [recording, setRecording] = useState(false);
+
+  const ipCamUrl = "http://192.168.100.204:8080/video";
 
   useEffect(() => {
-    if (!window.MediaRecorder) {
-      setStatus("Tu navegador no soporta MediaRecorder API");
-      return;
-    }
-    if (!MediaRecorder.isTypeSupported("video/mp4")) {
-      setStatus("MP4 no soportado. Usando WebM como alternativa.");
-      mimeTypeRef.current = "video/webm";
+    if (imgRef.current) {
+      imgRef.current.src = ipCamUrl;
     }
   }, []);
 
-  const captureFrame = () => {
-    if (!isRecording) return;
-    const ctx = canvasRef.current.getContext("2d");
-    try {
-      ctx.drawImage(videoRef.current, 0, 0, 640, 480);
-      setFramesCaptured(prev => prev + 1);
-    } catch (e) {
-      setStatus(`Error capturando frame: ${e.message}`);
-    }
+  const logStatus = (msg) => {
+    setStatus(msg);
+    console.log("[STATUS]", msg);
   };
 
-  const stopRecording = () => {
-    setIsRecording(false);
-    clearInterval(captureIntervalRef.current);
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-      mediaRecorder.stop();
-    }
-    setStatus("Grabación detenida");
-  };
+  const startRecording = async () => {
+    if (recording) return;
+    setRecording(true);
+    logStatus("Iniciando grabación...");
 
-  const uploadVideo = async (videoChunks) => {
-    const blob = new Blob(videoChunks, { type: mimeTypeRef.current });
-    const fileExtension = mimeTypeRef.current.includes("mp4") ? "mp4" : "webm";
-    const fileName = `video_${Date.now()}.${fileExtension}`;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
 
-    if (blob.size === 0) {
-      setStatus("El video está vacío");
-      return;
-    }
+    const chunks = [];
+    const stream = canvas.captureStream(10);
+    const mimeType = MediaRecorder.isTypeSupported("video/mp4")
+      ? "video/mp4"
+      : "video/webm";
 
-    const formData = new FormData();
-    const file = new File([blob], fileName, { type: mimeTypeRef.current });
-    formData.append("file", file, fileName);
-    formData.append("descripcion", "Video generado desde IPCameraRecorder");
-    formData.append("ubicacion", "Desconocida");
+    const recorder = new MediaRecorder(stream, { mimeType });
 
-    try {
-      const response = await fetch("http://localhost:8001/upload-video/", {
-        method: "POST",
-        body: formData,
-      });
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
 
-      const result = await response.json();
-      setStatus(`✅ Video subido: ${result.mensaje}`);
-    } catch (err) {
-      setStatus(`❌ Error al subir: ${err.message}`);
-    }
-  };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const fileName = `video_${Date.now()}.${mimeType.includes("mp4") ? "mp4" : "webm"}`;
 
-  const startRecording = () => {
-    if (isRecording) return;
+      const file = new File([blob], fileName, { type: mimeType });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("descripcion", "Grabación desde React");
+      formData.append("ubicacion", "Interfaz Web");
 
-    setChunks([]);
-    setFramesCaptured(0);
-    setIsRecording(true);
-    setStatus("Iniciando captura de frames...");
+      try {
+        const res = await fetch("http://localhost:8001/upload-video/", {
+          method: "POST",
+          body: formData,
+        });
 
-    captureIntervalRef.current = setInterval(captureFrame, 100);
-
-    setTimeout(() => {
-      if (framesCaptured === 0) {
-        setStatus("No se capturaron frames. Verifique la cámara.");
-        stopRecording();
-        return;
+        const result = await res.json();
+        logStatus(`✅ Subido: ${result.url_video}`);
+      } catch (err) {
+        logStatus("❌ Error al subir: " + err.message);
       }
 
-      const stream = canvasRef.current.captureStream(10);
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mimeTypeRef.current,
-      });
+      setRecording(false);
+    };
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) setChunks((prev) => [...prev, e.data]);
-      };
+    const interval = setInterval(() => {
+      try {
+        ctx.drawImage(imgRef.current, 0, 0, 640, 480);
+      } catch (e) {}
+    }, 100);
 
-      recorder.onstop = () => uploadVideo(chunks);
-      recorder.onerror = (e) => {
-        setStatus(`Error en grabación: ${e.error.name}`);
-        stopRecording();
-      };
-
-      recorder.start(1000);
-      setMediaRecorder(recorder);
-      setStatus(`🎥 Grabando en formato: ${mimeTypeRef.current}`);
-
-      setTimeout(() => {
-        if (recorder && recorder.state === "recording") {
-          recorder.stop();
-        }
-      }, 10000);
-    }, 500);
+    recorder.start();
+    setTimeout(() => {
+      recorder.stop();
+      clearInterval(interval);
+    }, 10000);
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Cámara IP en Vivo</h1>
       <img
-        ref={videoRef}
-        src={ipCamUrl}
-        alt="Cámara IP"
-        width="640"
-        height="480"
+        ref={imgRef}
+        className="border mb-4 w-[640px] h-[480px]"
+        alt="IP Camera"
         crossOrigin="anonymous"
-        className="rounded border"
       />
-      <canvas ref={canvasRef} width="640" height="480" className="hidden" />
-
+      <canvas ref={canvasRef} width="640" height="480" hidden></canvas>
       <button
         onClick={startRecording}
-        disabled={isRecording}
-        className={`mt-4 px-6 py-2 text-white rounded ${
-          isRecording ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+        disabled={recording}
+        className={`px-4 py-2 text-white rounded ${
+          recording ? "bg-red-500" : "bg-green-600"
         }`}
       >
-        {isRecording ? "🔴 Grabando..." : "Iniciar Grabación"}
+        {recording ? "🔴 Grabando..." : "Iniciar Grabación"}
       </button>
-
-      <div className="mt-4 p-2 bg-gray-100 rounded text-sm text-gray-800">
-        {status}
-      </div>
+      <div className="mt-3 text-sm text-gray-800">{status}</div>
     </div>
   );
-}
+};
+
+export default IPCameraRecorder;
