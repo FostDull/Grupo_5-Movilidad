@@ -4,6 +4,10 @@ import time
 from datetime import datetime
 from typing import Optional
 
+# === Cargar dotenv antes de usarlo ===
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
@@ -11,13 +15,18 @@ from pydantic import BaseModel, HttpUrl
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from dotenv import load_dotenv
 
-# === Cargar .env ===
-load_dotenv()
+# === Validación de variables obligatorias ===
+def get_env_variable(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"La variable de entorno {name} no está definida.")
+    return value
 
-# === Configuración CORS ===
+# === Inicialización FastAPI ===
 app = FastAPI()
+
+# === Middleware CORS ===
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,22 +34,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === MongoDB Atlas ===
-mongo_uri = os.getenv("MONGO_URI")
-mongo_db = os.getenv("MONGO_DB")
-mongo_collection = os.getenv("MONGO_COLLECTION")
+# === Configuración MongoDB Atlas ===
+mongo_uri = get_env_variable("MONGO_URI")
+mongo_db = get_env_variable("MONGO_DB")
+mongo_collection = get_env_variable("MONGO_COLLECTION")
 
 client = MongoClient(mongo_uri, server_api=ServerApi("1"))
 db = client[mongo_db]
 coleccion = db[mongo_collection]
 
-# === Backblaze B2 ===
-info = InMemoryAccountInfo()
-b2_api = B2Api(info)
-b2_api.authorize_account("production", os.getenv("B2_KEY_ID"), os.getenv("B2_APP_KEY"))
-bucket = b2_api.get_bucket_by_name(os.getenv("B2_BUCKET"))
+# === Configuración Backblaze B2 ===
+b2_key_id = get_env_variable("B2_KEY_ID")
+b2_app_key = get_env_variable("B2_APP_KEY")
+b2_bucket = get_env_variable("B2_BUCKET")
 
-# === Modelo de datos ===
+b2_info = InMemoryAccountInfo()
+b2_api = B2Api(b2_info)
+b2_api.authorize_account("production", b2_key_id, b2_app_key)
+bucket = b2_api.get_bucket_by_name(b2_bucket)
+
+# === Modelo para denuncias ===
 class Denuncia(BaseModel):
     descripcion: str
     ubicacion: str
@@ -48,12 +61,16 @@ class Denuncia(BaseModel):
     longitud: Optional[float] = None
     url: Optional[HttpUrl] = None
 
+# === Carpeta local para videos (opcional) ===
+CARPETA_VIDEOS = "./data/videos"
+os.makedirs(CARPETA_VIDEOS, exist_ok=True)
+
 # === Endpoint raíz ===
 @app.get("/")
 async def root():
     return {"message": "Servidor funcionando"}
 
-# === Subida de video con metadatos ===
+# === Subida de video con metadatos a Backblaze y MongoDB ===
 @app.post("/upload-video/")
 async def upload_video(
     file: UploadFile = File(...),
@@ -70,23 +87,21 @@ async def upload_video(
         "application/octet-stream"
     ]
 
-    # Verificación MIME
     if file.content_type not in valid_types:
         if not any(file.filename.lower().endswith(ext) for ext in ['.webm', '.mp4', '.mov', '.avi']):
             raise HTTPException(400, "Tipo de archivo no soportado. Formatos aceptados: .webm, .mp4, .mov, .avi")
 
-    # Generar nombre único
     file_ext = os.path.splitext(file.filename)[1] or ".webm"
     unique_filename = f"{uuid.uuid4()}{file_ext}"
 
     try:
         start = time.time()
         contenido = await file.read()
+
         archivo_subido = bucket.upload_bytes(contenido, unique_filename)
-        url_publica = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
+        url_publica = f"https://f000.backblazeb2.com/file/{b2_bucket}/{archivo_subido.file_name}"
         elapsed = time.time() - start
 
-        # Guardar en Mongo
         coleccion.insert_one({
             "descripcion": descripcion,
             "ubicacion": ubicacion,
@@ -119,7 +134,7 @@ async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(No
         contenido = await archivo.read()
         nombre = archivo.filename
         archivo_subido = bucket.upload_bytes(contenido, nombre)
-        evidencia_url = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
+        evidencia_url = f"https://f000.backblazeb2.com/file/{b2_bucket}/{archivo_subido.file_name}"
 
     documento = {
         "descripcion": data.descripcion,
@@ -133,7 +148,7 @@ async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(No
     coleccion.insert_one(documento)
     return {"mensaje": "Denuncia registrada", "url_evidencia": evidencia_url}
 
-# === Endpoint para denuncias sin archivo (por ejemplo, audio ya transcrito) ===
+# === Endpoint para denuncias solo con metadatos (ej. audio transcrito) ===
 @app.post("/denuncias/audio/")
 async def denuncia_audio(data: Denuncia):
     try:
@@ -146,10 +161,6 @@ async def denuncia_audio(data: Denuncia):
             "fecha": datetime.utcnow()
         })
         return {"mensaje": "Denuncia de audio registrada correctamente"}
+
     except Exception as e:
         raise HTTPException(500, detail=str(e))
-
-# === Arranque local ===
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
