@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cámara IP + Grabación</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      background: #f0f0f0;
+      min-height: 20px;
+    }
+    #recordBtn {
+      padding: 12px 24px;
+      font-size: 18px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    #recordBtn:disabled { background: #cccccc; }
+    #recordBtn.recording { background: #f44336; }
+    .error { color: #d32f2f; }
+    .success { color: #388e3c; }
+    .warning { color: #f57c00; }
+    .info { color: #1976d2; }
+  </style>
+</head>
+<body>
+  <h1>Cámara IP en Vivo</h1>
+
+  <div>
+    <img id="ipCamDisplay" width="640" height="480" alt="Cámara IP" crossorigin="anonymous" />
+  </div>
+
+  <button id="recordBtn" onclick="startRecording()">Iniciar Grabación</button>
+  <div id="status">Estado: Cámara activa</div>
+
+  <script>
+    const img = document.getElementById("ipCamDisplay");
+    const recordBtn = document.getElementById("recordBtn");
+    const status = document.getElementById("status");
+
+    // URL de la cámara IP
+    const ipCamUrl = "http://192.168.100.249:8080/video";
+    img.src = ipCamUrl;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext("2d");
+
+    let mediaRecorder = null;
+    let chunks = [];
+    let isRecording = false;
+    let framesCaptured = 0;
+    let captureInterval;
+    let mimeType = 'video/mp4'; // Forzar formato MP4
+
+    function logStatus(message, type = "info") {
+      status.innerHTML = `<span class="${type}">${message}</span>`;
+      console.log(`${type.toUpperCase()}: ${message}`);
+    }
+
+    // 1. Verificar soporte de MediaRecorder
+    function checkMediaRecorderSupport() {
+      if (!window.MediaRecorder) {
+        logStatus("Tu navegador no soporta MediaRecorder API", "error");
+        return false;
+      }
+
+      // Verificar soporte para MP4
+      if (!MediaRecorder.isTypeSupported('video/mp4')) {
+        logStatus("MP4 no soportado. Usando WebM como alternativa.", "warning");
+        mimeType = 'video/webm';
+      }
+
+      return true;
+    }
+
+    // 2. Iniciar captura de frames
+    function captureFrame() {
+      if (!isRecording) return;
+
+      try {
+        // Dibujar la imagen actual en el canvas
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        framesCaptured++;
+      } catch (e) {
+        logStatus(`Error capturando frame: ${e.message}`, "error");
+      }
+    }
+
+    // 3. Iniciar grabación
+    function startRecording() {
+      if (isRecording) return;
+
+      // Reiniciar contadores
+      framesCaptured = 0;
+      chunks = [];
+      isRecording = true;
+      recordBtn.disabled = true;
+      recordBtn.textContent = "🔴 Grabando...";
+      recordBtn.classList.add("recording");
+
+      logStatus("Iniciando captura de frames...", "info");
+
+      // Iniciar captura de frames (10 FPS)
+      captureInterval = setInterval(captureFrame, 100);
+
+      // Esperar 0.5 segundos para asegurar captura inicial
+      setTimeout(() => {
+        if (framesCaptured === 0) {
+          logStatus("No se capturaron frames. Verifique la cámara.", "error");
+          stopRecording();
+          return;
+        }
+
+        logStatus(`${framesCaptured} frames capturados. Iniciando grabación...`, "info");
+
+        try {
+          // Crear stream desde el canvas
+          const stream = canvas.captureStream(10); // 10 FPS
+
+          mediaRecorder = new MediaRecorder(stream, {
+            mimeType: mimeType
+          });
+
+          mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
+          };
+
+          mediaRecorder.onstop = uploadVideo;
+          mediaRecorder.onerror = e => {
+            logStatus(`Error en grabación: ${e.error.name}`, "error");
+            stopRecording();
+          };
+
+          mediaRecorder.start(1000); // Grabar en chunks de 1 segundo
+          logStatus(`🎥 Grabando en formato: ${mimeType}`, "success");
+
+          // Detener después de 10 segundos
+          setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+              mediaRecorder.stop();
+            }
+          }, 10000);
+
+        } catch (e) {
+          logStatus(`Error al iniciar grabación: ${e.message}`, "error");
+          stopRecording();
+        }
+      }, 500);
+    }
+
+    // 4. Detener grabación
+    function stopRecording() {
+      isRecording = false;
+      clearInterval(captureInterval);
+
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+
+      recordBtn.disabled = false;
+      recordBtn.classList.remove("recording");
+      recordBtn.textContent = "Iniciar Grabación";
+    }
+
+    // 5. Subir video
+    async function uploadVideo() {
+      if (chunks.length === 0) {
+        logStatus("No hay datos de video para subir", "warning");
+        return;
+      }
+
+      try {
+        // Crear el blob con el formato correcto
+        const blob = new Blob(chunks, { type: mimeType });
+
+        // Determinar extensión basada en el MIME type
+        const fileExtension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+
+        logStatus(`Video creado: ${blob.size} bytes, ${framesCaptured} frames`, "info");
+
+        if (blob.size === 0) {
+          logStatus("El video está vacío", "warning");
+          return;
+        }
+
+        const formData = new FormData();
+        const fileName = `video_${Date.now()}.${fileExtension}`;
+
+        // Crear un objeto File para forzar el tipo MIME
+        const file = new File([blob], fileName, { type: mimeType });
+        formData.append("file", file, fileName);
+
+        logStatus("Subiendo video al servidor...", "info");
+
+        const response = await fetch("http://localhost:8001/upload-video/", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        const result = await response.json();
+        logStatus(`✅ Video subido: ${result.message}`, "success");
+
+      } catch (err) {
+        logStatus(`❌ Error al subir: ${err.message}`, "error");
+      } finally {
+        stopRecording();
+      }
+    }
+
+    // Inicialización
+    function init() {
+      // Verificar compatibilidad
+      if (!checkMediaRecorderSupport()) {
+        recordBtn.disabled = true;
+      }
+
+      // La cámara ya está funcionando en el elemento img
+      logStatus("Cámara activa", "success");
+    }
+
+    // Iniciar cuando la página cargue
+    window.onload = init;
+  </script>
+</body>
+</html>
