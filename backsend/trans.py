@@ -1,108 +1,155 @@
-import sounddevice as sd
-import numpy as np
-from queue import Queue
-from faster_whisper import WhisperModel
-import tempfile
 import os
-import threading
-from scipy.io.wavfile import write
-from utils.backblaze_uploader import subir_a_backblaze
-import requests
-import json
+import uuid
+import time
+from datetime import datetime
+from typing import Optional
 
-# === Configuración ===
-fs = 16000  # frecuencia de muestreo
-chunk_duration = 10  # segundos por bloque
-modelo = "small"
-idioma_fijo = "es"
-device = "cpu"
-compute_type = "int8"
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, HttpUrl
 
-# === Modelo ===
-model = WhisperModel(modelo, device=device, compute_type=compute_type)
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
+from dotenv import load_dotenv
 
-# === Cola de audio ===
-cola_audio = Queue()
+# === Cargar .env ===
+load_dotenv()
 
-def obtener_ubicacion():
+# === Configuración CORS ===
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === MongoDB Atlas ===
+mongo_uri = os.getenv("MONGO_URI")
+mongo_db = os.getenv("MONGO_DB")
+mongo_collection = os.getenv("MONGO_COLLECTION")
+
+client = MongoClient(mongo_uri, server_api=ServerApi("1"))
+db = client[mongo_db]
+coleccion = db[mongo_collection]
+
+# === Backblaze B2 ===
+info = InMemoryAccountInfo()
+b2_api = B2Api(info)
+b2_api.authorize_account("production", os.getenv("B2_KEY_ID"), os.getenv("B2_APP_KEY"))
+bucket = b2_api.get_bucket_by_name(os.getenv("B2_BUCKET"))
+
+# === Modelo de datos ===
+class Denuncia(BaseModel):
+    descripcion: str
+    ubicacion: str
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    url: Optional[HttpUrl] = None
+
+# === Endpoint raíz ===
+@app.get("/")
+async def root():
+    return {"message": "Servidor funcionando"}
+
+# === Subida de video con metadatos ===
+@app.post("/upload-video/")
+async def upload_video(
+    file: UploadFile = File(...),
+    descripcion: str = "",
+    ubicacion: str = "",
+    latitud: Optional[float] = None,
+    longitud: Optional[float] = None
+):
+    valid_types = [
+        "video/webm",
+        "video/mp4",
+        "video/quicktime",
+        "video/x-msvideo",
+        "application/octet-stream"
+    ]
+
+    # Verificación MIME
+    if file.content_type not in valid_types:
+        if not any(file.filename.lower().endswith(ext) for ext in ['.webm', '.mp4', '.mov', '.avi']):
+            raise HTTPException(400, "Tipo de archivo no soportado. Formatos aceptados: .webm, .mp4, .mov, .avi")
+
+    # Generar nombre único
+    file_ext = os.path.splitext(file.filename)[1] or ".webm"
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+
     try:
-        response = requests.get("http://ip-api.com/json/")
-        if response.status_code == 200:
-            data = response.json()
-            ciudad = data.get("city", "Desconocida")
-            region = data.get("regionName", "")
-            pais = data.get("country", "")
-            lat = data.get("lat")
-            lon = data.get("lon")
+        start = time.time()
+        contenido = await file.read()
+        archivo_subido = bucket.upload_bytes(contenido, unique_filename)
+        url_publica = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
+        elapsed = time.time() - start
 
-            ubicacion_texto = f"{ciudad}, {region}, {pais}"
-            return ubicacion_texto, lat, lon
-        else:
-            return "Ubicación no disponible", 0.0, 0.0
-    except Exception as e:
-        print(f"Error al obtener ubicación: {e}")
-        return "Ubicación no disponible", 0.0, 0.0
-
-def grabar_audio():
-    print("Grabando...")
-    while True:
-        audio = sd.rec(int(chunk_duration * fs), samplerate=fs, channels=1, dtype="int16")
-        sd.wait()
-        cola_audio.put(audio.copy())
-
-def procesar_bloque(audio):
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            write(f.name, fs, audio)
-            audio_path = f.name
-
-        # Subir a Backblaze (bloqueante para asegurarnos URL)
-        url_evidencia = subir_a_backblaze(audio_path)
-
-        # Transcribir (bloqueante)
-        segments, _ = model.transcribe(audio_path, language=idioma_fijo, beam_size=1)
-
-        texto_completo = ""
-        for segment in segments:
-            texto_completo += segment.text + " "
-            print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
-
-        texto_completo = texto_completo.strip()
-
-        # Obtener ubicación con latitud y longitud
-        ubicacion_texto, latitud, longitud = obtener_ubicacion()
-
-        # Preparar datos para enviar a FastAPI
-        data = {
-            "descripcion": texto_completo,
-            "ubicacion": ubicacion_texto,
+        # Guardar en Mongo
+        coleccion.insert_one({
+            "descripcion": descripcion,
+            "ubicacion": ubicacion,
             "latitud": latitud,
             "longitud": longitud,
-            "url": url_evidencia
+            "url": url_publica,
+            "nombre_original": file.filename,
+            "nombre_guardado": archivo_subido.file_name,
+            "fecha": datetime.utcnow()
+        })
+
+        return {
+            "mensaje": f"Video subido a B2 ({len(contenido) / 1024:.1f} KB en {elapsed:.2f}s)",
+            "url_video": url_publica,
+            "nombre_archivo": archivo_subido.file_name
         }
 
-        # Enviar a FastAPI
-        response = requests.post("http://127.0.0.1:8086/denuncias/audio/", json=data)
-        print(f"Enviado a FastAPI: {response.status_code} {response.text}")
-
     except Exception as e:
-        print(f"Error en procesamiento: {e}")
+        raise HTTPException(500, f"Error al guardar el video: {str(e)}")
 
-    finally:
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
+# === Endpoint para denuncias con archivo o URL ===
+@app.post("/denuncias/")
+async def crear_denuncia(data: Denuncia, archivo: Optional[UploadFile] = File(None)):
+    if data.url and archivo:
+        raise HTTPException(400, detail="No se puede enviar URL y archivo al mismo tiempo.")
 
-def transcribir_audio():
-    while True:
-        audio = cola_audio.get()
-        threading.Thread(target=procesar_bloque, args=(audio,), daemon=True).start()
+    evidencia_url = data.url
 
-# === Lanzar hilos ===
-hilo_grabacion = threading.Thread(target=grabar_audio, daemon=True)
-hilo_transcripcion = threading.Thread(target=transcribir_audio, daemon=True)
+    if archivo:
+        contenido = await archivo.read()
+        nombre = archivo.filename
+        archivo_subido = bucket.upload_bytes(contenido, nombre)
+        evidencia_url = f"https://f000.backblazeb2.com/file/{os.getenv('B2_BUCKET')}/{archivo_subido.file_name}"
 
-hilo_grabacion.start()
-hilo_transcripcion.start()
+    documento = {
+        "descripcion": data.descripcion,
+        "ubicacion": data.ubicacion,
+        "latitud": data.latitud,
+        "longitud": data.longitud,
+        "url": str(evidencia_url) if evidencia_url else None,
+        "fecha": datetime.utcnow()
+    }
 
-hilo_grabacion.join()
-hilo_transcripcion.join()
+    coleccion.insert_one(documento)
+    return {"mensaje": "Denuncia registrada", "url_evidencia": evidencia_url}
+
+# === Endpoint para denuncias sin archivo (por ejemplo, audio ya transcrito) ===
+@app.post("/denuncias/audio/")
+async def denuncia_audio(data: Denuncia):
+    try:
+        coleccion.insert_one({
+            "descripcion": data.descripcion,
+            "ubicacion": data.ubicacion,
+            "latitud": data.latitud,
+            "longitud": data.longitud,
+            "url": str(data.url) if data.url else None,
+            "fecha": datetime.utcnow()
+        })
+        return {"mensaje": "Denuncia de audio registrada correctamente"}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+# === Arranque local ===
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
