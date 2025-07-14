@@ -1,4 +1,3 @@
-# --------------- utils/video_processing.py ---------------
 import os
 import cv2
 import json
@@ -7,6 +6,14 @@ import pandas as pd
 import torch
 from datetime import datetime
 from collections import defaultdict
+import logging
+
+# Configura logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Configurar entorno antes de importar Ultralytics
 os.environ['ULTRALYTICS_AUTOUPDATE'] = 'disabled'
@@ -15,11 +22,9 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 # ===== WORKAROUND PARA ULTRALYTICS 8.2.0 =====
 import ultralytics.utils.loss as loss_module
 
-
 class DFLoss:
     def __init__(self, *args, **kwargs):
         pass
-
 
 if not hasattr(loss_module, 'DFLoss'):
     loss_module.DFLoss = DFLoss
@@ -33,17 +38,16 @@ from .distance_utils import calcular_distancia_real
 from .alert_system import SistemaAlertas
 from .llm_utils import generar_justificacion
 
-# Configuración (hardcoded)
-MODEL_PERSONAS = "modelos/yolov8n.pt"
-MODEL_ARMAS = "modelos/weapon_yolov8n.pt"  # Usamos el modelo específico de armas
+# Configuración (usar variables de entorno)
+MODEL_PERSONAS = os.getenv("MODEL_PERSONAS", "modelos/yolov8n.pt")
+MODEL_ARMAS = os.getenv("MODEL_ARMAS", "modelos/weapon_yolov8n.pt")
 
 # Parámetros de detección
-DISTANCIA_UMBRAL = 1.5
-MIN_TIEMPO_ACOSO = 10
-MIN_ACERCAMIENTO = 0.2
-MAX_AREA_RATIO = 0.1
-MARGEN_ARMAS = 30  # Píxeles alrededor de personas para considerar arma asociada
-
+DISTANCIA_UMBRAL = float(os.getenv("DISTANCIA_UMBRAL", 1.5))
+MIN_TIEMPO_ACOSO = int(os.getenv("MIN_TIEMPO_ACOSO", 10))
+MIN_ACERCAMIENTO = float(os.getenv("MIN_ACERCAMIENTO", 0.2))
+MAX_AREA_RATIO = float(os.getenv("MAX_AREA_RATIO", 0.1))
+MARGEN_ARMAS = int(os.getenv("MARGEN_ARMAS", 30))
 
 def descargar_modelo_armas(ruta):
     """Descarga el modelo de armas si no existe"""
@@ -51,7 +55,7 @@ def descargar_modelo_armas(ruta):
         return
 
     os.makedirs(os.path.dirname(ruta), exist_ok=True)
-    print(f"Descargando modelo de armas en: {ruta}")
+    logger.info(f"Descargando modelo de armas en: {ruta}")
 
     try:
         import gdown
@@ -59,11 +63,10 @@ def descargar_modelo_armas(ruta):
             "https://drive.google.com/uc?id=1ZgqjONv3q43H9eBd5cG6JNkYd6tOjf1D",
             ruta, quiet=False
         )
-        print("Modelo descargado desde Google Drive")
+        logger.info("Modelo descargado desde Google Drive")
     except Exception as e:
-        print(f"Error al descargar modelo: {str(e)}")
+        logger.error(f"Error al descargar modelo: {str(e)}")
         raise
-
 
 def cargar_modelo_seguro(ruta_modelo):
     """Carga el modelo de forma segura evitando problemas de weights_only"""
@@ -75,28 +78,14 @@ def cargar_modelo_seguro(ruta_modelo):
         # Cargar directamente con Ultralytics
         return YOLO(ruta_modelo)
     except Exception as e:
-        print(f"Error cargando modelo ({e}), intentando carga alternativa...")
+        logger.error(f"Error cargando modelo ({e}), intentando carga alternativa...")
         try:
             # Cargar con torch directamente
             model = torch.hub.load('ultralytics/yolov5', 'custom', path=ruta_modelo)
             return model
         except Exception as e2:
-            print(f"Error en carga alternativa: {str(e2)}")
-            # Crear instancia de YOLO y cargar pesos manualmente
-            try:
-                print("Intentando carga manual...")
-                yolo_model = YOLO('yolov8n.yaml')  # Archivo de configuración base
-                weights = torch.load(ruta_modelo, map_location='cpu')
-                if 'model' in weights:
-                    state_dict = weights['model'].state_dict()
-                else:
-                    state_dict = weights
-                yolo_model.model.load_state_dict(state_dict)
-                return yolo_model
-            except Exception as e3:
-                print(f"Error en carga manual: {str(e3)}")
-                raise RuntimeError(f"No se pudo cargar el modelo: {ruta_modelo}")
-
+            logger.error(f"Error en carga alternativa: {str(e2)}")
+            raise RuntimeError(f"No se pudo cargar el modelo: {ruta_modelo}")
 
 def calcular_iou(boxA, boxB):
     xA = max(boxA[0], boxB[0])
@@ -108,7 +97,6 @@ def calcular_iou(boxA, boxB):
     areaB = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
     total_area = areaA + areaB - inter
     return inter / total_area if total_area > 0 else 0
-
 
 def arma_cerca_de_persona(arma_box, cajas_personas, margen):
     """Determina si un arma está cerca de alguna persona"""
@@ -134,14 +122,13 @@ def arma_cerca_de_persona(arma_box, cajas_personas, margen):
 
     return False
 
-
 def procesar_video(video_path):
     # Inicializar modelos con carga segura
     try:
         yolo_personas = cargar_modelo_seguro(MODEL_PERSONAS)
         yolo_armas = cargar_modelo_seguro(MODEL_ARMAS)
     except Exception as e:
-        print(f"Error crítico cargando modelos: {str(e)}")
+        logger.error(f"Error crítico cargando modelos: {str(e)}")
         return {"error": str(e)}, ""
 
     sistema = SistemaAlertas()
@@ -151,6 +138,9 @@ def procesar_video(video_path):
         "video": os.path.basename(video_path),
         "fecha_procesamiento": datetime.now().isoformat(),
         "alertas": [],
+        "tipo_evento": "",
+        "confianza": 0,
+        "frame_detectado": 0,
         "estadisticas": {
             "personas": 0,
             "armas": 0,
@@ -161,7 +151,7 @@ def procesar_video(video_path):
     # Preparar video de salida
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Error abriendo video: {video_path}")
+        logger.error(f"Error abriendo video: {video_path}")
         return resultados, ""
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -201,7 +191,7 @@ def procesar_video(video_path):
                     results = yolo_personas(frame)
                     res_pers = results.pandas().xyxy[0] if results else None
             except Exception as e:
-                print(f"Error en detección de personas: {str(e)}")
+                logger.error(f"Error en detección de personas: {str(e)}")
                 res_pers = None
 
         cajas = {}
@@ -228,7 +218,7 @@ def procesar_video(video_path):
                             cv2.putText(frame, f"ID:{tid}", (x1, y1 - 10),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
             except Exception as e:
-                print(f"Error procesando cajas personas: {str(e)}")
+                logger.error(f"Error procesando cajas personas: {str(e)}")
 
         # Detección de armas - SOLO SI HAY PERSONAS
         armas = []
@@ -243,7 +233,7 @@ def procesar_video(video_path):
                         results = yolo_armas(frame)
                         res_armas = results.pandas().xyxy[0] if results else None
                 except Exception as e:
-                    print(f"Error en detección de armas: {str(e)}")
+                    logger.error(f"Error en detección de armas: {str(e)}")
                     res_armas = None
 
             if res_armas is not None:
@@ -288,7 +278,7 @@ def procesar_video(video_path):
                                 cv2.putText(frame, f"ARMA {row['confidence']:.2f}", (x1, y1 - 10),
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 except Exception as e:
-                    print(f"Error procesando cajas armas: {str(e)}")
+                    logger.error(f"Error procesando cajas armas: {str(e)}")
 
         # Detección de interacciones
         posibles_acosadores = []
@@ -322,7 +312,7 @@ def procesar_video(video_path):
                         cv2.putText(frame, f"{d:.2f}m", ((cx1 + cx2) // 2, (cy1 + cy2) // 2),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
                 except Exception as e:
-                    print(f"Error calculando interacción: {str(e)}")
+                    logger.error(f"Error calculando interacción: {str(e)}")
 
         # Manejo de alertas
         if armas:
@@ -332,6 +322,7 @@ def procesar_video(video_path):
                 "tipo": "ARMA_DETECTADA",
                 "descripcion": f"Detectada arma con confianza {armas[0][4]:.2f} cerca de persona"
             })
+
         elif posibles_acosadores and sistema.registrar(len(posibles_acosadores)):
             sistema.activar("POSIBLE_ACOSO")
             descripcion = f"{len(posibles_acosadores)} interacciones sospechosas"
@@ -355,5 +346,12 @@ def procesar_video(video_path):
         "armas": len(armas),
         "interacciones": len(posibles_acosadores)
     }
+
+    # Determinar evento principal
+    if resultados["alertas"]:
+        ultima_alerta = resultados["alertas"][-1]
+        resultados["tipo_evento"] = ultima_alerta["tipo"]
+        resultados["confianza"] = 0.8  # Valor por defecto
+        resultados["frame_detectado"] = int(ultima_alerta["tiempo"] * fps)
 
     return resultados, video_salida
