@@ -1,0 +1,732 @@
+/* Paleta de Colores del Usuario */
+:root {
+  --color-white: #FFFFFF;
+  --color-purple: #6A1B9A; /* Morado principal del header y acentos */
+  --color-blue: #283593;   /* Azul para botones, acentos */
+  --color-red: #D32F2F;   /* Rojo para alertas */
+
+  /* Colores adicionales inspirados en la imagen (sin negro en fondos) */
+  --color-background-light: #F0F2F5; /* Fondo general muy claro (casi blanco) */
+  --color-card-background: #FFFFFF; /* Fondo de las tarjetas (blanco puro) */
+  --color-text-dark: #333333; /* Texto oscuro (gris muy oscuro, no negro puro) */
+  --color-text-light-secondary: #666666; /* Texto secundario más claro */
+  --color-border-subtle: #E0E0E0; /* Bordes sutiles de las tarjetas */
+  --color-header-gradient-start: #6A1B9A; /* Morado para el gradiente del header */
+  --color-header-gradient-end: #283593;   /* Azul para el gradiente del header */
+  --color-accent-blue-light: #00BCD4; /* Un azul cian para resaltar (similar al logo) */
+  --color-video-background: #424242; /* Un gris oscuro para el fondo del video, para contraste */
+}
+
+/* Estilos Generales */
+body {
+  margin: 0;
+  font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif; 
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background-light); /* Fondo principal claro */
+  color: var(--color-text-dark); /* Texto oscuro por defecto */
+  line-height: 1.6;
+  overflow-x: hidden; /* Evitar scroll horizontal */
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  align-items: center;
+  padding: 0; /* Quitamos el padding global para que el header y grid ocupen todo el ancho */
+  box-sizing: border-box;
+}
+
+/* Cabecera */
+.app-header {
+  background: linear-gradient(to right, var(--color-header-gradient-start), var(--color-header-gradient-end)); /* Gradiente morado/azul */
+  color: var(--color-white);
+  padding: 15px 30px;
+  width: 100%;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap; /* Para que sea responsive */
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  background-color: var(--color-white); 
+  padding: 8px 15px; 
+  border-radius: 8px; 
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); 
+  margin-left: -15px; 
+}
+
+.app-logo {
+  height: 45px; 
+  margin-right: 15px;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.3)); 
+  background-color: transparent; 
+}
+
+.app-title {
+  font-size: 1.8em;
+  color: var(--color-purple); 
+  margin: 0;
+  letter-spacing: 1px;
+  font-weight: 700;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.main-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 25px;
+}
+
+.main-nav li a {
+  color: var(--color-white);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1.1em;
+  padding: 5px 0;
+  transition: color 0.3s ease, border-bottom 0.3s ease;
+}
+
+.main-nav li a:hover {
+  color: var(--color-background-light); 
+  border-bottom: 2px solid var(--color-background-light);
+}
+
+.config-button {
+  background-color: var(--color-blue); 
+  color: var(--color-white);
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.config-button:hover {
+  background-color: #1A237E; 
+}
+
+/* Contenido Principal - Dashboard Grid */
+.dashboard-grid {
+  display: grid;
+  /* Definimos áreas para un control más preciso del layout */
+  grid-template-areas:
+    "video-area metrics-area"
+    "video-area status-area"
+    "video-area recording-control-area" 
+    "alerts-panel-area register-denuncia-area"; /* NUEVA ÁREA para la denuncia */
+  grid-template-columns: 2fr 1fr; /* Video a la izquierda (2/3), resto a la derecha (1/3) */
+  gap: 20px; 
+  width: 100%;
+  max-width: 1200px; 
+  padding: 20px;
+  box-sizing: border-box;
+  margin-top: 20px;
+}
+
+/* Estilos base para todas las tarjetas */
+.card {
+  background-color: var(--color-card-background); 
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.card-title {
+  color: var(--color-text-dark);
+  font-size: 1.4em;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: 10px;
+}
+
+/* Asignación de áreas a las tarjetas */
+.video-card {
+  grid-area: video-area;
+  position: relative; 
+}
+
+.metrics-card {
+  grid-area: metrics-area;
+}
+
+.status-system-card {
+  grid-area: status-area;
+}
+
+.recording-control-card { 
+  grid-area: recording-control-area;
+}
+
+.registered-alerts-panel-card {
+  grid-area: alerts-panel-area;
+}
+
+.register-denuncia-card { /* NUEVA TARJETA */
+  grid-area: register-denuncia-area;
+}
+
+
+/* Estilos específicos de los componentes */
+.video-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--color-video-background); 
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.video-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Alerta Inmediata/Temporal (overlay en el video) */
+.alerta {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-red);
+  color: var(--color-white);
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 1em;
+  text-align: center;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  animation: pulse-red 1.5s infinite alternate;
+}
+
+@keyframes pulse-red {
+  from { box-shadow: 0 0 5px var(--color-red); }
+  to { box-shadow: 0 0 15px var(--color-red); }
+}
+
+/* Métricas */
+.metrics-card .metric-items {
+  display: flex;
+  flex-direction: column; 
+  gap: 15px;
+  width: 100%;
+}
+
+.metrics-card .metric-item {
+  background-color: var(--color-background-light); 
+  padding: 15px;
+  border-radius: 5px;
+  text-align: center;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.metrics-card .metric-item h3 {
+  color: var(--color-text-dark);
+  font-size: 1.1em;
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.metrics-card .metric-count {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--color-blue); 
+}
+
+/* Estado del Sistema */
+.status-system-card .status-box {
+  padding: 20px;
+  border-radius: 5px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.2em;
+  color: var(--color-white);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.status-box.status-normal {
+  background-color: var(--color-blue);
+}
+
+.status-box.status-alert {
+  background-color: var(--color-red);
+  animation: pulse-red 1.5s infinite alternate;
+}
+
+.status-box .status-text {
+  margin: 0;
+}
+
+/* Control de Grabación */
+.recording-control-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.recording-control-card .record-btn {
+  padding: 12px 24px;
+  font-size: 1.1em;
+  cursor: pointer;
+  background: var(--color-blue); 
+  color: var(--color-white);
+  border: none;
+  border-radius: 8px;
+  transition: background 0.3s ease, transform 0.2s ease;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  margin-bottom: 15px;
+}
+
+.recording-control-card .record-btn:hover:not(:disabled) {
+  background: #1A237E; 
+  transform: translateY(-2px);
+}
+
+.recording-control-card .record-btn:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.recording-control-card .record-btn.recording {
+  background: var(--color-red); 
+  animation: pulse-red-button 1.5s infinite alternate; 
+}
+
+@keyframes pulse-red-button {
+  from { box-shadow: 0 0 5px var(--color-red), 0 0 10px var(--color-red); }
+  to { box-shadow: 0 0 15px var(--color-red), 0 0 30px var(--color-red); }
+}
+
+.recording-control-card .recording-status {
+  padding: 10px 15px;
+  border-radius: 5px;
+  min-height: 20px;
+  font-size: 0.95em;
+  font-weight: 500;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.recording-status.info { color: #1976d2; background-color: #e3f2fd; border: 1px solid #90caf9;}
+.recording-status.success { color: #388e3c; background-color: #e8f5e9; border: 1px solid #a5d6a7;}
+.recording-status.warning { color: #f57c00; background-color: #fff3e0; border: 1px solid #ffcc80;}
+.recording-status.error { color: #d32f2f; background-color: #ffebee; border: 1px solid #ef9a9a;}
+
+
+/* Panel de Alertas Registradas */
+.registered-alerts-panel-card .alerts-list {
+  max-height: 200px; 
+  overflow-y: auto; 
+  padding-right: 10px;
+  margin-bottom: 15px;
+  background-color: var(--color-background-light); 
+  border-radius: 5px;
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.registered-alerts-panel-card .alert-item {
+  background-color: var(--color-card-background);
+  border-left: 4px solid var(--color-red);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.registered-alerts-panel-card .alert-item:hover {
+  background-color: #EFEFEF;
+}
+
+.registered-alerts-panel-card .alert-item strong {
+  color: var(--color-text-dark);
+}
+
+.registered-alerts-panel-card .alert-item small {
+  color: var(--color-text-light-secondary);
+}
+
+.registered-alerts-panel-card .no-alerts-message {
+  color: var(--color-text-light-secondary);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.view-all-alerts-button {
+  background-color: var(--color-blue);
+  color: var(--color-white);
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9em;
+  align-self: center; 
+  margin-top: auto; 
+}
+
+.view-all-alerts-button:hover {
+  background-color: #1A237E;
+}
+
+/* NUEVOS ESTILOS: Registrar Denuncia Card */
+.register-denuncia-card {
+  /* No necesita grid-column/grid-row si ya está en grid-area */
+}
+
+.denuncia-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* Espacio entre grupos de formulario */
+}
+
+.denuncia-form .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.denuncia-form label {
+  font-size: 0.95em;
+  color: var(--color-text-dark);
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.denuncia-form input[type="text"],
+.denuncia-form input[type="number"],
+.denuncia-form textarea {
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 5px;
+  font-size: 1em;
+  color: var(--color-text-dark);
+  background-color: var(--color-background-light);
+  width: 100%;
+  box-sizing: border-box; /* Incluir padding y border en el ancho */
+}
+
+.denuncia-form textarea {
+  resize: vertical; /* Permitir redimensionar verticalmente */
+  min-height: 80px;
+}
+
+.denuncia-form input[type="file"] {
+  padding: 8px 0; /* Ajustar padding para input file */
+  font-size: 0.95em;
+  color: var(--color-text-dark);
+  background-color: transparent; /* Fondo transparente */
+  border: none; /* Sin borde */
+}
+
+.denuncia-form .form-group-inline {
+  display: flex;
+  gap: 15px;
+}
+
+.denuncia-form .form-group-inline .form-group {
+  flex: 1; /* Para que ocupen el mismo espacio */
+}
+
+.submit-denuncia-btn {
+  background-color: var(--color-purple);
+  color: var(--color-white);
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-top: 20px;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.submit-denuncia-btn:hover {
+  background-color: #4A148C; /* Morado más oscuro */
+  transform: translateY(-2px);
+}
+
+.denuncia-status {
+  margin-top: 15px;
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-size: 0.95em;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.denuncia-status.info { color: #1976d2; background-color: #e3f2fd; border: 1px solid #90caf9;}
+.denuncia-status.success { color: #388e3c; background-color: #e8f5e9; border: 1px solid #a5d6a7;}
+.denuncia-status.warning { color: #f57c00; background-color: #fff3e0; border: 1px solid #ffcc80;}
+.denuncia-status.error { color: #d32f2f; background-color: #ffebee; border: 1px solid #ef9a9a;}
+
+
+/* Modal de Detalles de Alerta (Reutilizado y ajustado) */
+.alert-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7); 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; 
+}
+
+.alert-detail-modal .modal-content {
+  background-color: var(--color-card-background); 
+  color: var(--color-text-dark);
+  padding: 30px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 800px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  max-height: 90vh; 
+  overflow-y: auto; 
+  position: relative; 
+}
+
+.alert-detail-modal .modal-content h3 {
+  color: var(--color-red); 
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.8em;
+}
+
+.alert-detail-modal .modal-content p {
+  margin-bottom: 8px;
+  font-size: 1em;
+}
+
+.alert-detail-modal .modal-content strong {
+  color: var(--color-blue);
+}
+
+.alert-detail-modal .alert-video {
+  margin: 20px auto;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.alert-detail-modal .alert-report-text {
+  background-color: var(--color-background-light);
+  color: var(--color-text-dark);
+  border: 1px solid var(--color-border-subtle);
+  padding: 15px;
+  border-radius: 5px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.95em;
+  white-space: pre-wrap;
+}
+
+.alert-detail-modal .close-modal-button {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: var(--color-text-light-secondary);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+}
+
+.alert-detail-modal .close-modal-button:hover {
+  color: var(--color-red);
+}
+
+.alert-detail-modal button {
+  background-color: var(--color-blue);
+  color: var(--color-white);
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1em;
+  margin-top: 20px;
+}
+
+/* Modal para "Ver todas las alertas" */
+.full-alerts-modal .alerts-list-full {
+  max-height: 500px;
+  overflow-y: auto;
+  background-color: var(--color-background-light);
+  border-radius: 5px;
+  padding: 15px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.full-alerts-modal .alerts-list-full .alert-item {
+  background-color: var(--color-card-background);
+  border-left: 4px solid var(--color-red);
+  padding: 10px 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr; /* Una sola columna en tablets */
+    grid-template-areas:
+      "video-area"
+      "metrics-area"
+      "status-area"
+      "recording-control-area" 
+      "alerts-panel-area"
+      "register-denuncia-area"; /* Reajuste para una columna */
+    gap: 20px;
+  }
+  
+  .app-header {
+    flex-direction: column;
+    padding: 15px 20px;
+  }
+  .main-nav ul {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  .config-button {
+    margin-top: 15px;
+  }
+
+  .app-logo {
+    height: 70px;
+    margin-right: 15px;
+  }
+  .app-title {
+    font-size: 2.8em;
+  }
+  .app-tagline {
+    font-size: 1.1em;
+  }
+  .card {
+    padding: 20px;
+    border-radius: 10px;
+  }
+  .card-title {
+    font-size: 1.5em;
+  }
+  .alerta {
+    font-size: 1.1em;
+    padding: 10px 20px;
+  }
+  .metrics-card .metric-count {
+    font-size: 2.5em;
+  }
+  .status-box .status-text {
+    font-size: 1.1em;
+  }
+  .modal-content {
+    padding: 30px;
+  }
+  .modal-content h3 {
+    font-size: 1.8em;
+  }
+  .modal-content button {
+    padding: 12px 25px;
+    font-size: 1.1em;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 10px 15px;
+  }
+  .logo-title-container {
+    flex-direction: column;
+    margin-bottom: 5px;
+  }
+  .app-logo {
+    height: 60px;
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+  .app-title {
+    font-size: 2.2em;
+    letter-spacing: 2px;
+  }
+  .app-tagline {
+    font-size: 1em;
+  }
+  .App {
+    padding: 15px;
+  }
+  .dashboard-grid {
+    gap: 15px;
+  }
+  .card {
+    padding: 15px;
+  }
+  .card-title {
+    font-size: 1.3em;
+  }
+  .alerta {
+    font-size: 0.9em;
+    padding: 8px 15px;
+    top: 15px;
+  }
+  .metrics-card .metric-items {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .metrics-card .metric-item {
+    padding: 10px;
+  }
+  .metrics-card .metric-count {
+    font-size: 2em;
+  }
+  .status-box {
+    padding: 15px;
+  }
+  .status-box .status-text {
+    font-size: 0.9em;
+  }
+  .alert-item {
+    padding: 12px 15px;
+  }
+  .alert-item strong {
+    font-size: 1.1em;
+  }
+  .alert-detail-modal .modal-content {
+    padding: 20px;
+  }
+  .modal-content h3 {
+    font-size: 1.6em;
+  }
+  .modal-content p {
+    font-size: 0.9em;
+  }
+  .modal-content button {
+    padding: 10px 20px;
+    font-size: 1em;
+  }
+  .close-modal-button {
+    font-size: 1.8em;
+    top: 10px;
+    right: 10px;
+  }
+}
