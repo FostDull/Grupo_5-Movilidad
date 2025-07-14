@@ -1,36 +1,13 @@
-# === API y servidor ===
 fastapi==0.110.0
 uvicorn==0.29.0
-python-multipart==0.0.9
-
-# === MongoDB y configuración ===
-pymongo==4.6.3
-python-dotenv==1.0.1
-
-# === Backblaze B2 ===
-b2sdk==1.26.0
-
-# === Audio y procesamiento ===
-sounddevice==0.4.6
-scipy==1.13.1
-numpy==1.26.4
-
-# === Transcripción y modelos ===
-faster-whisper==1.0.1
-ctranslate2==3.21.0          # versión recomendada estable
-torch==2.2.2
-torchaudio==2.2.1
-ffmpeg-python==0.2.0
-
-# === Visión por computadora y modelos adicionales ===
 opencv-python-headless==4.9.0.80
 ultralytics==8.2.0
-gdown==5.1.0
-
-# === Langchain + Groq (IA, LLMs, etc.) ===
-langchain-groq==0.1.2
-
-# === Herramientas varias ===
+torch==2.2.1
 requests==2.31.0
+python-multipart==0.0.9
+gdown==5.1.0
+langchain-groq==0.1.2
 watchdog==4.0.0
-pandas==2.2.2
+faster-whisper==0.10.0
+ffmpeg-python==0.2.0
+torchaudio==2.2.1

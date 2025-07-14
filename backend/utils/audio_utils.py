@@ -108,8 +108,8 @@ def procesar_audio(video_path, visual_json_path):
 
     # Generar JSON final
     result = {
-        "descripcion_delito": generar_descripcion_enriquecida(visual_data, transcription) if transcription else "Sin audio para análisis",
-        "url_evidencia": f"https://f000.backblazeb2.com/file/evidenciaskunturmovilidad/{file_name}",
+        "descripcion_delito": generar_descripcion_enriquecida(visual_data, transcription),
+        "url_evidencia": f"https://f000.backblazeb2.com/file/videoKr/{file_name}",
         "ip_camara": os.getenv("CAM_IP", "192.168.100.249"),
         "ubicacion_ip": location,
         "analisis_visual": {
@@ -117,10 +117,7 @@ def procesar_audio(video_path, visual_json_path):
             "confianza": visual_data.get("confianza", 0),
             "frame_detectado": visual_data.get("frame_detectado", 0)
         },
-        "analisis_audio": {
-            "transcripcion": transcription,
-            "resumen": summary
-        }
+        "resumen_audio": summary  # Solo el resumen, no la transcripción completa
     }
 
     # Guardar resultado
