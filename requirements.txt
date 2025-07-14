@@ -32,5 +32,6 @@ langchain-groq==0.1.2
 requests==2.31.0
 watchdog==4.0.0
 
-pip install opencv-python-headless
-pip install pandas
+opencv-python-headless==4.9.0.80
+opencv-python-headless
+pandas
