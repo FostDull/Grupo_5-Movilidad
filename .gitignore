@@ -1,13 +1,47 @@
-# Entorno virtual y PyCharm
+# .gitignore
+# Entornos virtuales
+venv/
+env/
 .venv/
-.idea/
+
+# Archivos de Python
 __pycache__/
-
-# Archivos temporales y logs
-*.log
 *.pyc
+*.pyo
+*.pyd
 
+# Archivos de desarrollo
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
 
-# Sistema
+# Archivos de datos
+data/
+*.mp4
+*.webm
+*.avi
+*.mov
+*.json
+
+# Archivos de modelos
+modelos/
+*.pt
+*.pth
+*.weights
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Backblaze credentials
+b2_credentials.json
