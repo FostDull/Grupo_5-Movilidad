@@ -1,53 +1,31 @@
-# Grupo_5-Movilidad
+# Sistema de Seguridad Kuntur Movilidad
 
-Proyecto de la Desarrollo de Sistemas de Información enfocado en la seguridad, específicamente en movilidad.
-# Sistema de Monitoreo y Alerta para Transporte Público
-**Proyecto académico de la materia: Desarrollo de Sistemas**  
-**Carrera:** Ingeniería en Sistemas  
-**Semestre:** 6to  
-**Grupo:** 5  
-**Integrantes:**  
-- Donovan (`DomoPili`)  
-- Jonathan (`FostDull`) 
-- Jessiel (``) 
+![Kuntur Movilidad Logo](https://via.placeholder.com/150?text=Kuntur+Logo)  
+Sistema avanzado de detección de comportamientos sospechosos mediante análisis de video en tiempo real con inteligencia artificial.
 
 ---
 
-## Descripción del proyecto
+## 🚀 Características Principales
 
-Este proyecto implementa un sistema inteligente de monitoreo para buses y taxis, utilizando inteligencia artificial (IA) para detectar situaciones sospechosas como robos o acoso dentro del vehículo. Al detectar un evento, el sistema:
-
-- Activa una alarma sonora 
-- Cierra automáticamente las puertas del vehículo 
-- Notifica a las autoridades competentes con ubicación y datos del incidente 
-
----
-
-## Tecnologías utilizadas
-
-| Tecnología | Función |
-|------------|---------|
-| Python     | Lenguaje principal del proyecto |
-| PyCharm    | Entorno de desarrollo (IDE) |
-| Git & GitHub | Control de versiones y colaboración |
-| OpenCV     | Captura y procesamiento de video |
-| Hugging Face (Transformers) | Modelo de IA para detección |
-| playsound  | Sonido de alarma |
-| requests   | Comunicación con API (notificación policial) |
+- 🎥 Captura de video desde cámaras IP  
+- 🧠 Detección de personas y armas con YOLOv8  
+- 📏 Análisis de distancias e interacciones  
+- ⚠️ Sistema de alertas inteligentes  
+- ☁️ Almacenamiento en Backblaze B2  
+- 💬 Justificación de alertas con LLM (Llama 3)  
+- 📼 Grabación automática de segmentos de 25 segundos en `.mp4`
 
 ---
 
-## Inteligencia Artificial usada
+## 📦 Instalación
 
-Utilizamos modelos preentrenados de [Hugging Face](https://huggingface.co/) como:
-- `google/vit-base-patch16-224` para clasificación de imágenes.
-- Opcionalmente se puede entrenar un modelo personalizado para detección de violencia o acoso.
+```bash
+# Clonar repositorio
+git clone https://github.com/FostDull/Grupo_5-Movilidad.git
+cd Grupo_5-Movilidad
 
----
+# Cambiar a rama de desarrollo
+git checkout Jessiel
 
-##  Estructura del proyecto
-Grupo_5-Movilidad/
-├── main.py # Código principal del sistema
-├── alarma.mp3 # Sonido de alarma
-├── requirements.txt # Lista de librerías necesarias
-└── README.md # Documentación del proyecto
+# Instalar dependencias
+pip install -r requirements.txt
