@@ -18,9 +18,7 @@ Sistema avanzado de detección de comportamientos sospechosos mediante análisis
 ---
 
 ## 📦 Instalación
-a
-
-```bash
+```
 # Clonar repositorio
 git clone https://github.com/FostDull/Grupo_5-Movilidad.git
 cd Grupo_5-Movilidad
@@ -31,8 +29,8 @@ git checkout Jessiel
 # Instalar dependencias
 pip install -r requirements.txt
 ```
+---
 Estructura del proyecto
-
 ```
 .
 ├── main.py # API principal
@@ -45,8 +43,9 @@ Estructura del proyecto
 └── requirements.txt # Dependencias del proyecto
 ```
 Aquitectura
-https://lucid.app/lucidchart/fefcf5ee-3113-40f3-96e8-d510bd5ad54b/edit?viewport_loc=-895%2C-821%2C3638%2C1796%2C0_0&invitationId=inv_10ada966-30ef-40b8-b5fe-8ba6cffc1164
 
+https://lucid.app/lucidchart/fefcf5ee-3113-40f3-96e8-d510bd5ad54b/edit?viewport_loc=-895%2C-821%2C3638%2C1796%2C0_0&invitationId=inv_10ada966-30ef-40b8-b5fe-8ba6cffc1164
+---
 📤 Subida de Videos
 Endpoint: POST /upload-video/
 
@@ -61,20 +60,22 @@ Copiar
 Editar
 curl -X POST "http://localhost:8001/upload-video/" -F "file=@video.mp4"
 ```
+---
 📥 Consulta de Alertas
 Endpoint: GET /alertas/
 
 Devuelve una lista de documentos de MongoDB convertidos a JSON.
-
+---
 🔐 CORS
 Este proyecto permite solicitudes desde cualquier origen (*). 
-Puedes restringirlo modificando la configuración de CORS en main.py.
 
+Puedes restringirlo modificando la configuración de CORS en main.py.
+---
 🛠 Recomendaciones
 Usa un servicio como Backblaze B2 o Amazon S3 para almacenar los videos en producción.
 
 Implementa autenticación para proteger los endpoints.
-
+---
 🚀 Cómo Funciona
 Carga los modelos de detección de personas y armas.
 
@@ -89,7 +90,7 @@ Evalúa interacciones entre personas para identificar acercamientos progresivos 
 Genera alertas e interpreta eventos.
 
 Exporta video procesado con anotaciones y resultados en JSON.
-
+---
 ▶️ Uso
 
 ```
@@ -99,6 +100,7 @@ resultados, salida_video = procesar_video("ruta/del/video.mp4")
 print(resultados)
 
 ```
+---
 💡 Notas
 Incluye workaround para ultralytics==8.2.0 relacionado con DFLoss.
 
