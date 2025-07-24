@@ -30,8 +30,10 @@ git checkout Jessiel
 
 # Instalar dependencias
 pip install -r requirements.txt
-
+```
 Estructura del proyecto
+
+```
 .
 ├── main.py # API principal
 ├── base/
@@ -41,7 +43,7 @@ Estructura del proyecto
 ├── static/ # Archivos estáticos servidos por la API
 ├── .env # Variables de entorno (no se sube al repo)
 └── requirements.txt # Dependencias del proyecto
-
+```
 Aquitectura
 https://lucid.app/lucidchart/fefcf5ee-3113-40f3-96e8-d510bd5ad54b/edit?viewport_loc=-895%2C-821%2C3638%2C1796%2C0_0&invitationId=inv_10ada966-30ef-40b8-b5fe-8ba6cffc1164
 
@@ -87,19 +89,19 @@ Genera alertas e interpreta eventos.
 Exporta video procesado con anotaciones y resultados en JSON.
 
 ▶️ Uso
-
+```
 from procesador_video import procesar_video
 
 resultados, salida_video = procesar_video("ruta/del/video.mp4")
 print(resultados)
-
+```
 💡 Notas
 Incluye workaround para ultralytics==8.2.0 relacionado con DFLoss.
 
 Compatible con YOLOv8 y YOLOv5 como fallback.
 
 Si el modelo de armas no está presente, se descargará automáticamente desde Google Drive.
-
+```
 {
   "video": "nombre.mp4",
   "fecha_procesamiento": "2025-07-16T14:00:00",
@@ -113,4 +115,4 @@ Si el modelo de armas no está presente, se descargará automáticamente desde G
     "interacciones": 2
   }
 }
-
+```
