@@ -70,19 +70,19 @@ curl -X POST "http://localhost:8001/upload-video/" -F "file=@video.mp4"
 Endpoint: GET /alertas/
 
 Devuelve una lista de documentos de MongoDB convertidos a JSON.
----
+
 
 # 🔐 CORS
 Este proyecto permite solicitudes desde cualquier origen (*). 
 
 Puedes restringirlo modificando la configuración de CORS en main.py.
----
+
 
 # 🛠 Recomendaciones
 Usa un servicio como Backblaze B2 o Amazon S3 para almacenar los videos en producción.
 
 Implementa autenticación para proteger los endpoints.
----
+
 
 # 🚀 Cómo Funciona
 Carga los modelos de detección de personas y armas.
@@ -98,7 +98,7 @@ Evalúa interacciones entre personas para identificar acercamientos progresivos 
 Genera alertas e interpreta eventos.
 
 Exporta video procesado con anotaciones y resultados en JSON.
----
+
 
 # ▶️ Uso
 
