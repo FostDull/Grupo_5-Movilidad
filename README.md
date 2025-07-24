@@ -60,13 +60,15 @@ bash
 Copiar
 Editar
 curl -X POST "http://localhost:8001/upload-video/" -F "file=@video.mp4"
+
 📥 Consulta de Alertas
 Endpoint: GET /alertas/
 
 Devuelve una lista de documentos de MongoDB convertidos a JSON.
 
 🔐 CORS
-Este proyecto permite solicitudes desde cualquier origen (*). Puedes restringirlo modificando la configuración de CORS en main.py.
+Este proyecto permite solicitudes desde cualquier origen (*). 
+Puedes restringirlo modificando la configuración de CORS en main.py.
 
 🛠 Recomendaciones
 Usa un servicio como Backblaze B2 o Amazon S3 para almacenar los videos en producción.
@@ -89,11 +91,13 @@ Genera alertas e interpreta eventos.
 Exporta video procesado con anotaciones y resultados en JSON.
 
 ▶️ Uso
+
 ```
 from procesador_video import procesar_video
 
 resultados, salida_video = procesar_video("ruta/del/video.mp4")
 print(resultados)
+
 ```
 💡 Notas
 Incluye workaround para ultralytics==8.2.0 relacionado con DFLoss.
@@ -102,6 +106,7 @@ Compatible con YOLOv8 y YOLOv5 como fallback.
 
 Si el modelo de armas no está presente, se descargará automáticamente desde Google Drive.
 ```
+
 {
   "video": "nombre.mp4",
   "fecha_procesamiento": "2025-07-16T14:00:00",
