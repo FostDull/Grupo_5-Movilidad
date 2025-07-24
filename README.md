@@ -56,11 +56,11 @@ Formatos permitidos: .webm, .mp4, .mov, .avi
 
 Ejemplo con curl:
 
-bash
+```
 Copiar
 Editar
 curl -X POST "http://localhost:8001/upload-video/" -F "file=@video.mp4"
-
+```
 📥 Consulta de Alertas
 Endpoint: GET /alertas/
 
