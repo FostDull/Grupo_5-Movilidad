@@ -91,7 +91,7 @@ Genera alertas e interpreta eventos.
 
 Exporta video procesado con anotaciones y resultados en JSON.
 ---
-▶️ Uso
+# ▶️ Uso
 
 ```
 from procesador_video import procesar_video
@@ -101,7 +101,7 @@ print(resultados)
 
 ```
 ---
-💡 Notas
+# 💡 Notas
 Incluye workaround para ultralytics==8.2.0 relacionado con DFLoss.
 
 Compatible con YOLOv8 y YOLOv5 como fallback.
